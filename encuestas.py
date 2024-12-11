@@ -44,6 +44,7 @@ def guardar_respuestas(respuestas):
         # Intentar cargar el archivo existente
         wb = load_workbook('respuestas.xlsx')
         sheet = wb.active
+
     except FileNotFoundError:
         # Si el archivo no existe, creamos uno nuevo
         wb = load_workbook('respuestas.xlsx')
