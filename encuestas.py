@@ -67,12 +67,14 @@ def mostrar_encuesta():
         st.write(
             f"**Fecha y Hora:** {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-    # Título e instrucciones
-    st.title("Instrucciones")
+    # Título e instrucciones en recuadro gris
     st.markdown("""
-    **Gracias por participar en esta encuesta. La misma es anónima y tiene fines estrictamente académicos para una tesis doctoral. 
-    Lea cuidadosamente y seleccione la opción que considere pertinente, al culminar presione Enviar.**
-    """)
+    <div style="background-color: #f0f0f0; padding: 10px; border-radius: 5px;">
+    <h2>Instrucciones</h2>
+    <p><strong>Gracias por participar en esta encuesta. La misma es anónima y tiene fines estrictamente académicos para una tesis doctoral. 
+    Lea cuidadosamente y seleccione la opción que considere pertinente, al culminar presione Enviar.</strong></p>
+    </div>
+    """, unsafe_allow_html=True)
 
     # Datos demográficos
     st.header("Datos Demográficos")
@@ -93,6 +95,7 @@ def mostrar_encuesta():
     # Preguntas del Excel
     st.header("Preguntas de la Encuesta")
     preguntas_faltantes = []
+    all_answered = True
     for i, row in df_preguntas.iterrows():
         pregunta_id = row['item']
         pregunta_texto = row['pregunta']
@@ -103,6 +106,7 @@ def mostrar_encuesta():
         borde = "2px solid blue"
         if st.session_state.get(f"respuesta_{pregunta_id}") is None:
             borde = "3px solid red"  # Si no está respondida, se marca en rojo
+            all_answered = False
 
         # Mostrar la pregunta
         st.markdown(
@@ -119,15 +123,21 @@ def mostrar_encuesta():
         )
         respuestas[pregunta_id] = respuesta
 
-    # Verificar si todas las preguntas han sido respondidas
-    todas_contestadas = all(respuestas.get(
-        f"respuesta_{row['item']}") is not None for _, row in df_preguntas.iterrows())
+    # Contador de respuestas
+    num_respuestas = sum(1 for v in respuestas.values() if v is not None)
+    total_preguntas = len(df_preguntas)
 
-    # Mostrar botón de enviar solo si todas las preguntas han sido respondidas
-    enviar_disabled = not todas_contestadas
+    # Mostrar el contador de respuestas
+    st.markdown(f"**Respuestas: {num_respuestas}/{total_preguntas}**")
+
+    # Mostrar el botón solo si todas las respuestas están contestadas
+    if all_answered:
+        submit_disabled = False
+    else:
+        submit_disabled = True
 
     # Definir el botón de Enviar
-    submit_button = st.button("Enviar", disabled=enviar_disabled)
+    submit_button = st.button("Enviar", disabled=submit_disabled)
 
     if submit_button:
         preguntas_faltantes.clear()
@@ -154,7 +164,7 @@ def mostrar_encuesta():
             st.stop()
 
     # Mostrar mensaje si todas las preguntas han sido respondidas
-    if todas_contestadas:
+    if all_answered:
         st.markdown(
             "### Todas las preguntas han sido respondidas correctamente.", unsafe_allow_html=True)
 
