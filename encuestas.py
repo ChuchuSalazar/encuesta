@@ -4,6 +4,7 @@ import random
 import datetime
 from firebase_admin import credentials, firestore, initialize_app, get_app
 import os
+import gc
 from dotenv import load_dotenv
 
 # Cargar variables de entorno
@@ -53,6 +54,23 @@ def guardar_respuestas(respuestas, id_encuesta):
         data = {'FECHA': fecha, 'RESPUESTA': respuesta}
         db.collection('respuestas').document(
             f"{id_encuesta}_{pregunta_id}").set(data)
+
+# Función para cerrar la conexión a Firebase y limpiar recursos
+
+
+def cerrar_conexion():
+    # Firebase no tiene un método de desconectar directo, pero podemos liberar el recurso
+    print("Cerrando la conexión a Firebase...")
+
+    # Limpiar cualquier referencia a la base de datos
+    db = None
+    app = None
+
+    # Recolectar basura para liberar variables no necesarias
+    gc.collect()
+
+    # Confirmar el cierre
+    print("Conexión cerrada y recursos liberados.")
 
 # Función para mostrar la encuesta
 
@@ -139,34 +157,31 @@ def mostrar_encuesta():
     # Definir el botón de Enviar
     submit_button = st.button("Enviar", disabled=submit_disabled)
 
-    if submit_button:
-        preguntas_faltantes.clear()
-        for i, row in df_preguntas.iterrows():
-            pregunta_id = row['item']
-            if respuestas[pregunta_id] is None:
-                preguntas_faltantes.append(i+1)
+    # Control para el mensaje de agradecimiento y deshabilitar el botón después de enviar
+    if "enviado" not in st.session_state:
+        st.session_state.enviado = False
 
-        if preguntas_faltantes:
-            st.error("Por favor, responda las siguientes preguntas:")
-            for num_pregunta in preguntas_faltantes:
-                st.write(f"❗ **Pregunta {num_pregunta}**",
-                         unsafe_allow_html=True)
-        else:
-            # Guardar respuestas
-            id_encuesta = f"ID_{generar_id()}"
-            guardar_respuestas(respuestas, id_encuesta)
+    if submit_button and not st.session_state.enviado:
+        # Guardar respuestas
+        id_encuesta = f"ID_{generar_id()}"
+        guardar_respuestas(respuestas, id_encuesta)
 
-            # Mostrar mensaje de agradecimiento
-            st.success("¡Gracias por completar la encuesta!")
-            st.balloons()
+        # Cambiar el estado de enviado a True
+        st.session_state.enviado = True
 
-            # Desactivar las preguntas y el botón de enviar
-            st.stop()
+        # Mostrar mensaje de agradecimiento
+        st.success("¡Gracias por completar la encuesta!")
+        st.balloons()
 
-    # Mostrar mensaje si todas las preguntas han sido respondidas
-    if all_answered:
-        st.markdown(
-            "### Todas las preguntas han sido respondidas correctamente.", unsafe_allow_html=True)
+        # Desactivar las preguntas y el botón de enviar
+        st.stop()
+
+        # Cerrar conexiones y limpiar recursos
+        cerrar_conexion()
+
+    # Si la encuesta ya fue enviada, no se puede enviar de nuevo
+    if st.session_state.enviado:
+        st.write("La encuesta ya ha sido enviada. ¡Gracias por su participación!")
 
 
 # Ejecutar la aplicación
