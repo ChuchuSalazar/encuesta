@@ -51,18 +51,60 @@ def guardar_respuestas(respuestas):
     # Guardar los datos en Realtime Database
     ref.child(id_encuesta).set(data)
 
+# Mostrar mensaje emergente para advertencia de las preguntas
+
+
+def mostrar_mensaje_advertencia():
+    st.warning(
+        "Por favor, responda todas las preguntas antes de enviar la encuesta.")
+    if st.button("Aceptar"):
+        return True
+    return False
+
 # Mostrar encuesta
 
 
 def mostrar_encuesta():
     st.title("Encuesta de Hábitos de Ahorro")
-    st.write("Por favor, responda todas las preguntas obligatorias.")
+    st.write("Por favor, complete todas las preguntas obligatorias.")
+
+    # Mostrar mensaje emergente de advertencia
+    if not mostrar_mensaje_advertencia():
+        return  # No se puede continuar hasta que el usuario acepte
 
     # Diccionario para respuestas
     respuestas = {}
     preguntas_faltantes = []  # Para rastrear preguntas sin responder
 
-    # Sección de preguntas
+    # Sección de preguntas demográficas
+    st.header("Datos Demográficos")
+
+    # Pregunta de sexo (Checklist con una opción seleccionable)
+    sexo = st.radio("¿Cuál es su sexo?", ("Masculino",
+                    "Femenino", "Otro"), key="sexo")
+    respuestas["sexo"] = sexo
+
+    # Pregunta de ciudad (Combo List)
+    ciudades = ["Caracas", "Maracaibo", "Valencia", "Barquisimeto", "Maracay"]
+    ciudad = st.selectbox("¿En qué ciudad reside?", ciudades, key="ciudad")
+    respuestas["ciudad"] = ciudad
+
+    # Pregunta de rango de edad (Checklist con un rango de opciones)
+    rango_edad = st.radio("¿Cuál es su rango de edad?", ("18-25",
+                          "26-35", "36-45", "46-60", "Más de 60"), key="rango_edad")
+    respuestas["rango_edad"] = rango_edad
+
+    # Pregunta de rango de ingreso (Checklist horizontal)
+    rango_ingreso = st.radio("¿En qué rango de ingresos se encuentra?", (
+        "Menos de 100 USD", "100-500 USD", "500-1000 USD", "Más de 1000 USD"), key="rango_ingreso")
+    respuestas["rango_ingreso"] = rango_ingreso
+
+    # Pregunta de nivel educativo (Checklist)
+    nivel_educativo = st.radio("¿Cuál es su nivel educativo?", ("Primaria",
+                               "Secundaria", "Técnico", "Universitario", "Posgrado"), key="nivel_educativo")
+    respuestas["nivel_educativo"] = nivel_educativo
+
+    # Sección de preguntas de la encuesta
     st.header("Preguntas de la Encuesta")
     for i, row in df_preguntas.iterrows():
         # Esto debe ser el código del sesgo (AV, SQ, CM, DH)
