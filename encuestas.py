@@ -3,7 +3,7 @@ import pandas as pd
 import random
 from datetime import datetime
 
-# Función para generar un ID aleatorio
+# Generar un ID aleatorio
 
 
 def generar_id():
@@ -14,6 +14,7 @@ def generar_id():
 
 def cargar_preguntas():
     try:
+        # Leer el archivo Excel asegurando que la primera fila sea usada como encabezado
         preguntas_df = pd.read_excel("preguntas.xlsx")
         return preguntas_df
     except FileNotFoundError:
@@ -65,7 +66,10 @@ def mostrar_encuesta():
                 font-weight: bold;
                 text-align: center;
                 cursor: pointer;
-                width: 120px;
+                width: 150px;
+            }
+            .radio label {
+                margin-right: 10px;
             }
         </style>
     """, unsafe_allow_html=True)
@@ -79,26 +83,22 @@ def mostrar_encuesta():
     # Género
     st.markdown("**Seleccione su género:**")
     col1, col2, col3 = st.columns(3)
-    sexo = None
     with col1:
-        if st.button("🧑‍💼 Hombre", key="hombre"):
-            sexo = "Masculino"
+        sexo = st.button("🧑 Hombre", key="hombre")
     with col2:
-        if st.button("👩‍💼 Mujer", key="mujer"):
-            sexo = "Femenino"
+        sexo = st.button("👩 Mujer", key="mujer")
     with col3:
-        if st.button("🌈 Otro", key="otro"):
-            sexo = "Otro"
+        sexo = st.button("🌈 Otro", key="otro")
 
     # Rango de Edad
     st.markdown("**Seleccione su rango de edad:**")
-    rango_edad = st.slider("Rango de edad:", min_value=18,
-                           max_value=99, value=25, step=1)
+    rango_edad = st.slider("Edad:", min_value=18,
+                           max_value=99, value=(25, 35), step=1)
 
     # Rango de Salario
-    st.markdown("**Indique su rango de salario mensual (en USD):**")
-    rango_salario = st.number_input(
-        "Ingrese su salario:", min_value=0, max_value=10000, step=50)
+    st.markdown("**Seleccione su rango de salario mensual (en USD):**")
+    salario_min, salario_max = st.slider(
+        "Rango de salario:", min_value=0, max_value=10000, value=(100, 1000), step=50)
 
     # Nivel Educativo
     st.markdown("**Seleccione su nivel educativo:**")
@@ -106,6 +106,7 @@ def mostrar_encuesta():
         "Nivel educativo:",
         options=["Primaria", "Secundaria", "Universitaria", "Posgrado"],
         horizontal=True,
+        index=None,
         label_visibility="collapsed"
     )
 
@@ -122,9 +123,15 @@ def mostrar_encuesta():
         respuestas = {}
         contador_respondidas = 0
 
+        # Asegurarse de que las filas comienzan desde la segunda fila de datos (evitar usar la primera fila de encabezado)
         for index, row in preguntas_df.iterrows():
+            if index == 0:  # Ignorar la primera fila de los nombres de las columnas
+                continue
+
             pregunta = row['pregunta']
-            escala = row['escala'].split(";")
+            # Asegúrate de que 'escala' sea tratado como texto
+            # Convertir a cadena antes de aplicar split()
+            escala = str(row['escala']).split(";")
             with st.container():
                 st.markdown(
                     f"<div style='color: blue; border: 1px solid #0056b3; padding: 10px; border-radius: 5px; margin-bottom: 5px;'>"
@@ -145,22 +152,9 @@ def mostrar_encuesta():
         enviar_btn = st.button("Enviar Encuesta")
         if enviar_btn:
             faltantes = [k for k, v in respuestas.items() if not v]
-            if len(faltantes) == 0 and sexo and educacion and rango_salario and ciudad:
+            if len(faltantes) == 0 and educacion and ciudad:
                 st.success("¡Gracias por responder la encuesta!")
                 st.balloons()
-
-                # Guardar respuestas
-                with open("respuestas_guardadas.txt", "w") as file:
-                    file.write(f"ID Control: {
-                               numero_control}\nFecha y Hora: {fecha_hora}\n")
-                    file.write("Datos Demográficos:\n")
-                    file.write(f"Género: {sexo}\nEdad: {
-                               rango_edad}\nSalario: {rango_salario}\n")
-                    file.write(f"Nivel Educativo: {
-                               educacion}\nCiudad: {ciudad}\n")
-                    file.write("Respuestas de la Encuesta:\n")
-                    for k, v in respuestas.items():
-                        file.write(f"{k}: {v}\n")
             else:
                 st.error(
                     "Por favor, responda todas las preguntas y complete los datos demográficos.")
