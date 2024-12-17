@@ -68,7 +68,7 @@ def generar_qr(numero_control):
 
     # Convertir la imagen a un formato adecuado para mostrar en Streamlit
     img_byte_arr = io.BytesIO()
-    img_qr.save(img_byte_arr)
+    img_qr.save(img_byte_arr, format='PNG')  # Especificar el formato PNG
     img_byte_arr.seek(0)
     return img_byte_arr
 
