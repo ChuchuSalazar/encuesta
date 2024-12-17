@@ -4,10 +4,10 @@ import random
 import datetime
 from firebase_admin import credentials, firestore, initialize_app, get_app
 import os
-import gc
-import qrcode
-from io import BytesIO
 from dotenv import load_dotenv
+import qrcode
+from PIL import Image
+import io
 
 # Cargar variables de entorno
 load_dotenv()
@@ -23,7 +23,7 @@ except ValueError as e:
 # Conectar a Firestore
 db = firestore.client()
 
-# Función para generar un ID único
+# Generar un ID único
 
 
 def generar_id():
@@ -33,184 +33,133 @@ def generar_id():
 # URL del archivo de preguntas
 url_preguntas = 'https://raw.githubusercontent.com/ChuchuSalazar/encuesta/main/preguntas.xlsx'
 
-# Función para cargar preguntas con un spinner
-
-
-def cargar_preguntas(url):
-    with st.spinner('Cargando las preguntas...'):
-        df = pd.read_excel(url, header=0)
-        df['escala'] = pd.to_numeric(
-            df['escala'], errors='coerce').dropna().astype(int)
-    return df
-
-
 # Cargar preguntas
-df_preguntas = cargar_preguntas(url_preguntas)
+df_preguntas = pd.read_excel(url_preguntas, header=0)
+df_preguntas.columns = ['item', 'pregunta', 'escala', 'posibles_respuestas']
 
-# Función para guardar respuestas en Firebase
+# Guardar respuestas en Firebase
 
 
-def guardar_respuestas(respuestas, id_encuesta):
+def guardar_respuestas(respuestas, numero_control):
+    id_encuesta = f"ID_{numero_control}"
     fecha = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    for pregunta_id, respuesta in respuestas.items():
-        data = {'FECHA': fecha, 'RESPUESTA': respuesta}
-        db.collection('respuestas').document(
-            f"{id_encuesta}_{pregunta_id}").set(data)
 
-# Función para cerrar la conexión a Firebase y limpiar recursos
+    data = {'FECHA': fecha, 'NUMERO_CONTROL': numero_control}
+    for key, value in respuestas.items():
+        data[key] = value
 
+    db.collection('respuestas').document(id_encuesta).set(data)
 
-def cerrar_conexion():
-    # Firebase no tiene un método de desconectar directo, pero podemos liberar el recurso
-    print("Cerrando la conexión a Firebase...")
-
-    # Limpiar cualquier referencia a la base de datos
-    db = None
-    app = None
-
-    # Recolectar basura para liberar variables no necesarias
-    gc.collect()
-
-    # Confirmar el cierre
-    print("Conexión cerrada y recursos liberados.")
-
-# Función para generar el QR del número de control
+# Generar un código QR con el número de control y agregar logo
 
 
-def generar_qr(id_encuesta):
-    qr = qrcode.make(id_encuesta)
-    qr_io = BytesIO()
-    qr.save(qr_io)
-    qr_io.seek(0)
-    return qr_io
+def generar_qr(numero_control, logo_path=None):
+    qr = qrcode.QRCode(
+        version=1,  # Controlar el tamaño del QR
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,  # Ajustar el tamaño de los cuadros
+        border=4,
+    )
+    qr.add_data(numero_control)
+    qr.make(fit=True)
 
-# Función para mostrar la encuesta
+    # Crear imagen del QR
+    img_qr = qr.make_image(fill='black', back_color='white').convert('RGB')
+
+    if logo_path:
+        logo = Image.open(logo_path)
+        logo = logo.resize((40, 40))  # Ajustar el tamaño del logo
+        qr_width, qr_height = img_qr.size
+        logo_pos = ((qr_width - logo.width) // 2,
+                    (qr_height - logo.height) // 2)
+        img_qr.paste(logo, logo_pos, logo)
+
+    # Convertir la imagen a un formato adecuado para mostrar en Streamlit
+    img_byte_arr = io.BytesIO()
+    img_qr.save(img_byte_arr)
+    img_byte_arr.seek(0)
+    return img_byte_arr
+
+# Mostrar encuesta
 
 
 def mostrar_encuesta():
-    # Logo UCAB y fecha actual
-    col_logo, col_fecha = st.columns([5, 1])
-    with col_logo:
-        st.image(
-            "https://upload.wikimedia.org/wikipedia/commons/2/2c/Logo_UCAB.png", width=100)
-    with col_fecha:
-        fecha_hora = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        st.write(f"**Fecha y Hora:** {fecha_hora}")
+    st.title("Encuesta de Hábitos de Ahorro")
+    st.write("Por favor, responda todas las preguntas obligatorias.")
 
-    # Generar y mostrar el número de control (ID único)
-    id_encuesta = f"ID_{generar_id()}"
-    st.write(f"**Número de Control:** {id_encuesta}")
+    # Mostrar la fecha y hora de la encuesta
+    fecha_hora = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    st.write(f"Fecha y hora de inicio: {fecha_hora}")
 
-    # Mostrar el código QR del número de control
-    qr_img = generar_qr(id_encuesta)
-    st.image(qr_img, caption="Número de Control (QR)")
+    # Generar un número de control
+    numero_control = generar_id()
 
-    # Título e instrucciones en recuadro gris
-    st.markdown("""
-    <div style="background-color: #f0f0f0; padding: 10px; border-radius: 5px;">
-    <h2>Instrucciones</h2>
-    <p><strong>Gracias por participar en esta encuesta. La misma es anónima y tiene fines estrictamente académicos para una tesis doctoral. 
-    Lea cuidadosamente y seleccione la opción que considere pertinente, al culminar presione Enviar.</strong></p>
-    </div>
-    """, unsafe_allow_html=True)
+    # Mostrar el número de control como texto
+    st.write(f"**Número de Control:** {numero_control}")
 
-    # Datos demográficos en un solo recuadro azul
-    st.markdown("""
-    <div style="border: 2px solid blue; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
-    <h3>Datos Demográficos</h3>
-    </div>
-    """, unsafe_allow_html=True)
+    # Mostrar el número de control en formato QR
+    qr_img = generar_qr(numero_control, logo_path="ucab_logo.png")
+    st.image(qr_img, use_column_width=False, width=150)
 
-    respuestas = {}
-    col1, col2 = st.columns(2)
-    with col1:
-        respuestas['sexo'] = st.radio(
-            "1. Sexo:", ["Masculino", "Femenino", "Otro"], horizontal=True, index=None)
-        respuestas['rango_edad'] = st.radio("2. Rango de Edad:", [
-                                            "18-25", "26-35", "36-45", "46-60", "60+"], horizontal=True, index=None)
-    with col2:
-        respuestas['rango_ingresos'] = st.radio(
-            "3. Rango de Ingresos:", ["<500", "500-1000", "1000-2000", ">2000"], index=None)
-        respuestas['nivel_educacion'] = st.selectbox("4. Nivel de Educación:", [
-                                                     "Primaria", "Secundaria", "Pregrado", "Posgrado", "Doctorado"], index=None)
-        respuestas['ciudad'] = st.text_input("5. Ciudad:", "")
+    # Crear recuadro para las preguntas demográficas
+    st.markdown("<div style='background-color: #e0e0e0; padding: 10px;'>",
+                unsafe_allow_html=True)
+    st.subheader("Datos Demográficos")
 
-    # Preguntas del Excel
-    st.header("Preguntas de la Encuesta")
-    preguntas_faltantes = []
-    all_answered = True
-    for i, row in df_preguntas.iterrows():
-        pregunta_id = row['item']
-        pregunta_texto = row['pregunta']
-        escala = row['escala']
-        opciones = row['posibles_respuestas'].split(',')[:escala]
+    # Preguntas Demográficas con validación de respuestas
+    sexo = st.radio("1. ¿Cuál es su sexo?", [
+                    "Masculino", "Femenino", "Otro"], index=0)
+    rango_edad = st.radio("2. ¿En qué rango de edad se encuentra?", [
+                          "18-24", "25-34", "35-44", "45-54", "55+"])
+    ingreso = st.radio("3. ¿Cuál es su rango de ingresos mensuales?", [
+                       "Menos de $500", "$500 - $1000", "$1000 - $2000", "Más de $2000"])
+    ciudad = st.selectbox("4. ¿En qué ciudad reside?", [
+                          "Caracas", "Valencia", "Maracaibo", "Barquisimeto", "Otra"])
+    nivel_educacion = st.selectbox("5. ¿Cuál es su nivel de educación?", [
+                                   "Secundaria", "Pregrado", "Posgrado"])
 
-        # Estilo de pregunta
-        borde = "2px solid blue"
-        if st.session_state.get(f"respuesta_{pregunta_id}") is None:
-            borde = "3px solid red"  # Si no está respondida, se marca en rojo
-            all_answered = False
+    # Aquí agregarías las demás preguntas de la encuesta, pero por ahora mostramos solo las demográficas
 
-        # Mostrar la pregunta
-        st.markdown(
-            f"""<div style="border: {borde}; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
-            <b>{i+6}. {pregunta_texto}</b>  <!-- Las preguntas empiezan desde el 6 porque las primeras 5 son demográficas -->
-            </div>""",
-            unsafe_allow_html=True
-        )
-        respuesta = st.radio(
-            f"Seleccione una opción para la Pregunta {i+6}:",
-            opciones,
-            index=None,
-            key=f"respuesta_{pregunta_id}"
-        )
-        respuestas[pregunta_id] = respuesta
+    st.markdown("</div>", unsafe_allow_html=True)  # Cerrar recuadro
 
-    # Validación para asegurarse de que todas las preguntas (incluyendo las demográficas) estén respondidas
-    all_answered = all(v is not None for v in respuestas.values())
+    # Botón para enviar
+    if st.button("Enviar"):
+        respuestas = {
+            "sexo": sexo,
+            "rango_edad": rango_edad,
+            "ingreso": ingreso,
+            "ciudad": ciudad,
+            "nivel_educacion": nivel_educacion,
+            # Añadir las respuestas de las otras preguntas
+        }
 
-    # Contador de respuestas
-    num_respuestas = sum(1 for v in respuestas.values() if v is not None)
-    total_preguntas = 25  # Incluyendo las 5 preguntas demográficas
+        # Validación de respuestas
+        todas_contestadas = all(
+            [sexo, rango_edad, ingreso, ciudad, nivel_educacion])
 
-    # Mostrar el contador de respuestas
-    st.markdown(f"**Respuestas: {num_respuestas}/{total_preguntas}**")
+        if todas_contestadas:
+            # Guardar respuestas
+            guardar_respuestas(respuestas, numero_control)
+            st.success("¡Gracias por completar la encuesta!")
+            st.balloons()
 
-    # Mostrar el botón solo si todas las respuestas están contestadas
-    if all_answered:
-        submit_disabled = False
-    else:
-        submit_disabled = True
+            # Deshabilitar botón y mostrar mensaje
+            st.write(
+                "La encuesta ha sido cerrada. No es posible volver a contestar.")
 
-    # Definir el botón de Enviar
-    submit_button = st.button("Enviar", disabled=submit_disabled)
-
-    # Control para el mensaje de agradecimiento y deshabilitar el botón después de enviar
-    if "enviado" not in st.session_state:
-        st.session_state.enviado = False
-
-    if submit_button and not st.session_state.enviado:
-        # Guardar respuestas
-        guardar_respuestas(respuestas, id_encuesta)
-
-        # Cambiar el estado de enviado a True
-        st.session_state.enviado = True
-
-        # Mostrar mensaje de agradecimiento
-        st.success("¡Gracias por completar la encuesta!")
-        st.balloons()
-
-        # Desactivar las preguntas y el botón de enviar
-        st.stop()
-
-        # Cerrar conexiones y limpiar recursos
-        cerrar_conexion()
-
-    # Si la encuesta ya fue enviada, no se puede enviar de nuevo
-    if st.session_state.enviado:
-        st.write("La encuesta ya ha sido enviada. ¡Gracias por su participación!")
+            # Cambiar color de los recuadros a azul (ya respondidos)
+            st.markdown("""
+                <style>
+                    .stRadio, .stSelectbox { 
+                        border: 2px solid #2196F3;
+                        background-color: #E3F2FD;
+                    }
+                </style>
+                """, unsafe_allow_html=True)
+        else:
+            st.error("Por favor, responda todas las preguntas.")
 
 
-# Ejecutar la aplicación
+# Ejecutar la encuesta
 if __name__ == '__main__':
     mostrar_encuesta()
