@@ -34,34 +34,13 @@ url_preguntas = 'https://raw.githubusercontent.com/ChuchuSalazar/encuesta/main/p
 
 
 def cargar_preguntas(url):
-    try:
-        # Leer el archivo Excel y tomar la primera fila como encabezados
-        # header=0 indica que la primera fila son los nombres de columnas
-        df = pd.read_excel(url, header=0)
-
-        # Verificar que las columnas esperadas existan
-        columnas_esperadas = ['item', 'pregunta',
-                              'escala', 'posibles_respuestas']
-        if not all(col in df.columns for col in columnas_esperadas):
-            st.error(
-                "El archivo no contiene las columnas esperadas: 'item', 'pregunta', 'escala', 'posibles_respuestas'")
-            st.stop()
-
-        # Validar y limpiar la columna 'escala'
-        # Convierte 'escala' a numérico; NaN si falla
-        df['escala'] = pd.to_numeric(df['escala'], errors='coerce')
-        # Elimina filas donde 'escala' no es numérico
-        df = df.dropna(subset=['escala'])
-        # Asegura que 'escala' sea entero
-        df['escala'] = df['escala'].astype(int)
-
-        return df
-    except Exception as e:
-        st.error(f"Error al cargar las preguntas: {e}")
-        st.stop()
+    df = pd.read_excel(url, header=0)
+    df['escala'] = pd.to_numeric(
+        df['escala'], errors='coerce').dropna().astype(int)
+    return df
 
 
-# Cargar preguntas desde el archivo
+# Cargar preguntas
 df_preguntas = cargar_preguntas(url_preguntas)
 
 # Función para guardar respuestas en Firebase
@@ -70,82 +49,110 @@ df_preguntas = cargar_preguntas(url_preguntas)
 def guardar_respuestas(respuestas):
     id_encuesta = f"ID_{generar_id()}"
     fecha = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    for pregunta_id, respuesta in respuestas.items():
+        data = {'FECHA': fecha, 'RESPUESTA': respuesta}
+        db.collection('respuestas').document(
+            f"{id_encuesta}_{pregunta_id}").set(data)
 
-    data = {'FECHA': fecha}
-    for key, value in respuestas.items():
-        data[key] = value
-
-    db.collection('respuestas').document(id_encuesta).set(data)
-
-# Función para mostrar la encuesta
+# Mostrar encuesta
 
 
 def mostrar_encuesta():
-    st.title("Encuesta de Hábitos de Ahorro")
-    st.write("Por favor, responda todas las preguntas obligatorias.")
+    # Logo UCAB y fecha actual
+    col_logo, col_fecha = st.columns([5, 1])
+    with col_logo:
+        st.image(
+            "https://upload.wikimedia.org/wikipedia/commons/2/2c/Logo_UCAB.png", width=100)
+    with col_fecha:
+        st.write(
+            f"**Fecha y Hora:** {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-    # Diccionario para almacenar respuestas
+    # Título e instrucciones
+    st.title("Instrucciones")
+    st.markdown("""
+    **Gracias por participar en esta encuesta. La misma es anónima y tiene fines estrictamente académicos para una tesis doctoral. 
+    Lea cuidadosamente y seleccione la opción que considere pertinente, al culminar presione Enviar.**
+    """)
+
+    # Datos demográficos
+    st.header("Datos Demográficos")
     respuestas = {}
-    preguntas_faltantes = []  # Para rastrear preguntas sin respuesta
+    col1, col2 = st.columns(2)
+    with col1:
+        respuestas['sexo'] = st.radio(
+            "1. Sexo:", ["Masculino", "Femenino", "Otro"], horizontal=True, index=None)
+        respuestas['rango_edad'] = st.radio("2. Rango de Edad:", [
+                                            "18-25", "26-35", "36-45", "46-60", "60+"], horizontal=True, index=None)
+    with col2:
+        respuestas['rango_ingresos'] = st.radio(
+            "3. Rango de Ingresos:", ["<500", "500-1000", "1000-2000", ">2000"], index=None)
+        respuestas['nivel_educacion'] = st.selectbox("4. Nivel de Educación:", [
+                                                     "Primaria", "Secundaria", "Pregrado", "Posgrado", "Doctorado"], index=None)
+        respuestas['ciudad'] = st.text_input("5. Ciudad:", "")
 
-    # Sección de preguntas
+    # Preguntas del Excel
     st.header("Preguntas de la Encuesta")
+    preguntas_faltantes = []
+    temporal_no_respondidas = []
     for i, row in df_preguntas.iterrows():
         pregunta_id = row['item']
         pregunta_texto = row['pregunta']
-        escala = int(row['escala'])
+        escala = row['escala']
         opciones = row['posibles_respuestas'].split(',')[:escala]
 
-        # Inicializar estilos
-        estilo_borde = f"2px solid blue"  # Azul por defecto
-        texto_bold = ""
+        # Estilo de pregunta
+        borde = "2px solid blue"
+        if st.session_state.get(f"respuesta_{pregunta_id}") is None:
+            temporal_no_respondidas.append(f"Pregunta {i+1}")
+            borde = "3px solid red"  # Si no está respondida, se marca en rojo
 
-        # Validar preguntas no respondidas
-        if st.session_state.get(f"respuesta_{pregunta_id}", None) is None and pregunta_id in preguntas_faltantes:
-            estilo_borde = f"3px solid red"  # Borde rojo para preguntas sin respuesta
-            texto_bold = "font-weight: bold;"
-
-        # Mostrar pregunta con estilo
+        # Mostrar la pregunta
         st.markdown(
-            f"""<div style="border: {estilo_borde}; padding: 10px; border-radius: 5px; {texto_bold}">
-                    {pregunta_texto}
-                </div>""",
-            unsafe_allow_html=True,
+            f"""<div style="border: {borde}; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
+            <b>{i+1}. {pregunta_texto}</b>
+            </div>""",
+            unsafe_allow_html=True
         )
-
-        # Crear opciones de respuesta
         respuesta = st.radio(
             f"Seleccione una opción para la Pregunta {i+1}:",
             opciones,
-            index=None,  # Sin selección predeterminada
-            key=f"respuesta_{pregunta_id}",
+            index=None,
+            key=f"respuesta_{pregunta_id}"
         )
         respuestas[pregunta_id] = respuesta
 
-    # Botón para enviar respuestas
+    # Control de preguntas no contestadas
     if st.button("Enviar"):
         preguntas_faltantes.clear()
-
-        # Validar que todas las preguntas tengan respuesta
         for i, row in df_preguntas.iterrows():
             pregunta_id = row['item']
             if respuestas[pregunta_id] is None:
-                preguntas_faltantes.append((i + 1, pregunta_id))
+                preguntas_faltantes.append(i+1)
 
-        # Si hay preguntas faltantes, mostrar advertencias
         if preguntas_faltantes:
             st.error("Por favor, responda las siguientes preguntas:")
-            for num_pregunta, _ in preguntas_faltantes:
-                st.write(f"❗ Pregunta {num_pregunta}")
+            for num_pregunta in preguntas_faltantes:
+                st.write(f"❗ **Pregunta {num_pregunta}**",
+                         unsafe_allow_html=True)
         else:
-            # Guardar respuestas en Firebase
             guardar_respuestas(respuestas)
             st.success("¡Gracias por completar la encuesta!")
             st.balloons()
-            st.write("La encuesta ha sido enviada exitosamente.")
             st.stop()
 
+    # Mostrar preguntas no respondidas en temporal rojo
+    if temporal_no_respondidas:
+        st.markdown("### Preguntas no contestadas:")
+        st.markdown(
+            f"<span style='color: red;'>{
+                ', '.join(temporal_no_respondidas)}</span>",
+            unsafe_allow_html=True
+        )
+    else:
+        st.markdown(
+            "### Todas las preguntas han sido respondidas correctamente.", unsafe_allow_html=True)
 
-# Ejecutar la encuesta
+
+# Ejecutar la aplicación
 if __name__ == '__main__':
     mostrar_encuesta()
