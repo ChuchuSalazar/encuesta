@@ -93,7 +93,6 @@ def mostrar_encuesta():
     # Preguntas del Excel
     st.header("Preguntas de la Encuesta")
     preguntas_faltantes = []
-    temporal_no_respondidas = []
     for i, row in df_preguntas.iterrows():
         pregunta_id = row['item']
         pregunta_texto = row['pregunta']
@@ -103,7 +102,6 @@ def mostrar_encuesta():
         # Estilo de pregunta
         borde = "2px solid blue"
         if st.session_state.get(f"respuesta_{pregunta_id}") is None:
-            temporal_no_respondidas.append(f"Pregunta {i+1}")
             borde = "3px solid red"  # Si no está respondida, se marca en rojo
 
         # Mostrar la pregunta
@@ -121,8 +119,17 @@ def mostrar_encuesta():
         )
         respuestas[pregunta_id] = respuesta
 
-    # Control de preguntas no contestadas
-    if st.button("Enviar"):
+    # Verificar si todas las preguntas han sido respondidas
+    todas_contestadas = all(respuestas.get(
+        f"respuesta_{row['item']}") is not None for _, row in df_preguntas.iterrows())
+
+    # Mostrar botón de enviar solo si todas las preguntas han sido respondidas
+    enviar_disabled = not todas_contestadas
+
+    # Definir el botón de Enviar
+    submit_button = st.button("Enviar", disabled=enviar_disabled)
+
+    if submit_button:
         preguntas_faltantes.clear()
         for i, row in df_preguntas.iterrows():
             pregunta_id = row['item']
@@ -143,18 +150,11 @@ def mostrar_encuesta():
             st.success("¡Gracias por completar la encuesta!")
             st.balloons()
 
-            # Evitar que se vuelva a contestar
+            # Desactivar las preguntas y el botón de enviar
             st.stop()
 
-    # Mostrar preguntas no respondidas en temporal rojo
-    if temporal_no_respondidas:
-        st.markdown("### Preguntas no contestadas:")
-        st.markdown(
-            f"<span style='color: red;'>{
-                ', '.join(temporal_no_respondidas)}</span>",
-            unsafe_allow_html=True
-        )
-    else:
+    # Mostrar mensaje si todas las preguntas han sido respondidas
+    if todas_contestadas:
         st.markdown(
             "### Todas las preguntas han sido respondidas correctamente.", unsafe_allow_html=True)
 
