@@ -98,7 +98,7 @@ def mostrar_encuesta():
     st.write(f"**Número de Control:** {numero_control}")
 
     # Mostrar el número de control en formato QR
-    qr_img = generar_qr(numero_control, logo_path="ucab_logo.png")
+    qr_img = generar_qr(numero_control, logo_path="logo_ucab.jpg")
     st.image(qr_img, use_column_width=False, width=150)
 
     # Crear recuadro para las preguntas demográficas
