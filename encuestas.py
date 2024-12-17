@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS")
 
-# Inicializar Firebase solo si no se ha inicializado previamente
+# Inicializar Firebase, pero solo si no se ha inicializado previamente
 try:
     app = get_app()
 except ValueError as e:
@@ -34,7 +34,6 @@ url_preguntas = 'https://raw.githubusercontent.com/ChuchuSalazar/encuesta/main/p
 
 
 def cargar_preguntas(url):
-    # Usamos st.spinner para mostrar mensaje de carga mientras cargamos los datos
     with st.spinner('Cargando las preguntas...'):
         df = pd.read_excel(url, header=0)
         df['escala'] = pd.to_numeric(
