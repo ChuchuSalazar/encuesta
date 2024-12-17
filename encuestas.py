@@ -90,15 +90,15 @@ def mostrar_encuesta():
     with col3:
         sexo = st.button("🌈 Otro", key="otro")
 
-    # Rango de Edad
+    # Rango de Edad - Usar las opciones del código
     st.markdown("**Seleccione su rango de edad:**")
-    rango_edad = st.slider("Edad:", min_value=18,
-                           max_value=99, value=(25, 35), step=1)
+    rangos_edad = ["18-25", "26-35", "36-45", "46-55", "56+"]
+    rango_edad = st.radio("Edad:", options=rangos_edad, key="rango_edad")
 
-    # Rango de Salario
+    # Rango de Salario - Usar las opciones del código
     st.markdown("**Seleccione su rango de salario mensual (en USD):**")
-    salario_min, salario_max = st.slider(
-        "Rango de salario:", min_value=0, max_value=10000, value=(100, 1000), step=50)
+    rangos_salario = ["0-1000", "1001-5000", "5001-10000", "10001+"]
+    salario = st.radio("Salario:", options=rangos_salario, key="rango_salario")
 
     # Nivel Educativo
     st.markdown("**Seleccione su nivel educativo:**")
@@ -129,17 +129,22 @@ def mostrar_encuesta():
                 continue
 
             pregunta = row['pregunta']
-            # Asegúrate de que 'escala' sea tratado como texto
-            # Convertir a cadena antes de aplicar split()
-            escala = str(row['escala']).split(";")
+            # Asegúrate de que 'posibles respuestas' esté bien tratado
+            posibles_respuestas = str(row['posibles respuestas']).split(
+                ",")  # Convertir a cadena antes de aplicar split()
+
+            # Si la escala es mayor que 1, mostrar un radio button con las respuestas posibles
             with st.container():
                 st.markdown(
                     f"<div style='color: blue; border: 1px solid #0056b3; padding: 10px; border-radius: 5px; margin-bottom: 5px;'>"
                     f"<strong>{index + 1}. {pregunta}</strong></div>",
                     unsafe_allow_html=True
                 )
-                respuesta = st.radio("", options=escala, key=f"pregunta_{
-                                     index}", index=None, horizontal=True)
+                if len(posibles_respuestas) > 1:
+                    respuesta = st.radio("", options=posibles_respuestas, key=f"pregunta_{
+                                         index}", index=None)
+                else:
+                    respuesta = st.text_input("", key=f"pregunta_{index}")
                 respuestas[f"pregunta_{index}"] = respuesta
                 if respuesta:
                     contador_respondidas += 1
