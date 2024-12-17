@@ -50,10 +50,10 @@ def guardar_respuestas(respuestas, numero_control):
 
     db.collection('respuestas').document(id_encuesta).set(data)
 
-# Generar un código QR con el número de control y agregar logo
+# Generar un código QR con el número de control
 
 
-def generar_qr(numero_control, logo_path=None):
+def generar_qr(numero_control):
     qr = qrcode.QRCode(
         version=1,  # Controlar el tamaño del QR
         error_correction=qrcode.constants.ERROR_CORRECT_L,
@@ -65,14 +65,6 @@ def generar_qr(numero_control, logo_path=None):
 
     # Crear imagen del QR
     img_qr = qr.make_image(fill='black', back_color='white').convert('RGB')
-
-    if logo_path:
-        logo = Image.open(logo_path)
-        logo = logo.resize((40, 40))  # Ajustar el tamaño del logo
-        qr_width, qr_height = img_qr.size
-        logo_pos = ((qr_width - logo.width) // 2,
-                    (qr_height - logo.height) // 2)
-        img_qr.paste(logo, logo_pos, logo)
 
     # Convertir la imagen a un formato adecuado para mostrar en Streamlit
     img_byte_arr = io.BytesIO()
@@ -98,8 +90,12 @@ def mostrar_encuesta():
     st.write(f"**Número de Control:** {numero_control}")
 
     # Mostrar el número de control en formato QR
-    qr_img = generar_qr(numero_control, logo_path="logo_ucab.jpg")
+    qr_img = generar_qr(numero_control)
     st.image(qr_img, use_column_width=False, width=150)
+
+    # Mostrar el logo UCAB en la esquina superior derecha
+    logo_ucab = Image.open("logo_ucab.jpg")
+    st.image(logo_ucab, width=100, use_column_width=False)
 
     # Crear recuadro para las preguntas demográficas
     st.markdown("<div style='background-color: #e0e0e0; padding: 10px;'>",
