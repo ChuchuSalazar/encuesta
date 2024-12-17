@@ -82,8 +82,12 @@ def mostrar_encuesta():
         st.image(
             "https://upload.wikimedia.org/wikipedia/commons/2/2c/Logo_UCAB.png", width=100)
     with col_fecha:
-        st.write(
-            f"**Fecha y Hora:** {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        fecha_hora = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        st.write(f"**Fecha y Hora:** {fecha_hora}")
+
+    # Generar y mostrar el número de control (ID único)
+    id_encuesta = f"ID_{generar_id()}"
+    st.write(f"**Número de Control:** {id_encuesta}")
 
     # Título e instrucciones en recuadro gris
     st.markdown("""
@@ -166,7 +170,6 @@ def mostrar_encuesta():
 
     if submit_button and not st.session_state.enviado:
         # Guardar respuestas
-        id_encuesta = f"ID_{generar_id()}"
         guardar_respuestas(respuestas, id_encuesta)
 
         # Cambiar el estado de enviado a True
