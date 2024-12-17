@@ -129,21 +129,24 @@ def mostrar_encuesta():
         # Mostrar la pregunta
         st.markdown(
             f"""<div style="border: {borde}; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
-            <b>{i+1}. {pregunta_texto}</b>
+            <b>{i+6}. {pregunta_texto}</b>  <!-- Las preguntas empiezan desde el 6 porque las primeras 5 son demográficas -->
             </div>""",
             unsafe_allow_html=True
         )
         respuesta = st.radio(
-            f"Seleccione una opción para la Pregunta {i+1}:",
+            f"Seleccione una opción para la Pregunta {i+6}:",
             opciones,
             index=None,
             key=f"respuesta_{pregunta_id}"
         )
         respuestas[pregunta_id] = respuesta
 
+    # Validación para asegurarse de que todas las preguntas (incluyendo las demográficas) estén respondidas
+    all_answered = all(v is not None for v in respuestas.values())
+
     # Contador de respuestas
     num_respuestas = sum(1 for v in respuestas.values() if v is not None)
-    total_preguntas = len(df_preguntas)
+    total_preguntas = 25  # Incluyendo las 5 preguntas demográficas
 
     # Mostrar el contador de respuestas
     st.markdown(f"**Respuestas: {num_respuestas}/{total_preguntas}**")
