@@ -11,7 +11,7 @@ from io import BytesIO
 def generar_id():
     return random.randint(100000, 999999)
 
-# Generar código QR a partir del ID de control
+# Generar código QR
 
 
 def generar_qr(numero_control):
@@ -24,11 +24,9 @@ def generar_qr(numero_control):
 
 
 def cargar_preguntas():
-    # Asegúrate de tener el archivo
-    preguntas_df = pd.read_excel("preguntas.xls")
-    return preguntas_df
+    return pd.read_excel("preguntas.xlsx")
 
-# Función principal
+# Mostrar encuesta principal
 
 
 def mostrar_encuesta():
@@ -45,85 +43,81 @@ def mostrar_encuesta():
         st.subheader(f"Fecha y hora: {fecha_hora}")
         st.write(f"**Número de Control:** {numero_control}")
     with col2:
-        # Coloca el logo UCAB
         st.image("logo_ucab.jpg", use_container_width=True)
         st.image(qr_img, width=100)
 
     # --- Texto introductorio ---
     st.markdown("""
-    <div style="border: 1px solid #888; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">
-        <h4 style="color: #333;">Instrucciones</h4>
-        <p><strong>Gracias por participar en esta encuesta. La misma es anónima y tiene fines estrictamente académicos para una tesis doctoral. Lea cuidadosamente y seleccione la opción que considere pertinente, al culminar presione Enviar.</strong></p>
+    <div style="background-color: #f0f0f0; padding: 15px; border-radius: 5px; border: 1px solid #ccc;">
+        <h4>Instrucciones</h4>
+        <p><strong>Gracias por participar en esta encuesta. La misma es anónima y tiene fines estrictamente académicos. Lea cuidadosamente y seleccione la opción que considere pertinente, al culminar presione Enviar.</strong></p>
     </div>
     """, unsafe_allow_html=True)
 
-    # --- Preguntas Demográficas ---
+    # --- Datos demográficos ---
     st.markdown("### **Datos Demográficos**")
-    with st.container():
-        col1, col2 = st.columns(2)
-        demograficos = {}
-        demograficos['Edad'] = col1.number_input(
-            "¿Cuál es su edad?", min_value=18, max_value=99, step=1)
-        demograficos['Género'] = col2.selectbox(
-            "Seleccione su género:", ["", "Masculino", "Femenino", "Otro"])
-        demograficos['Ciudad'] = col1.text_input("¿En qué ciudad reside?")
-        demograficos['Ingresos'] = col2.selectbox(
-            "Rango de ingresos:", ["", "Bajo", "Medio", "Alto"])
-        demograficos['Educación'] = col1.selectbox(
-            "Nivel educativo:", ["", "Primaria", "Secundaria", "Universitaria", "Posgrado"])
+    demograficos = {
+        "Edad": st.number_input("¿Cuál es su edad?", min_value=18, max_value=99, step=1),
+        "Género": st.selectbox("Seleccione su género:", ["", "Masculino", "Femenino", "Otro"]),
+        "Ciudad": st.text_input("¿En qué ciudad reside?"),
+        "Ingresos": st.selectbox("Rango de ingresos:", ["", "Bajo", "Medio", "Alto"]),
+        "Educación": st.selectbox("Nivel educativo:", ["", "Primaria", "Secundaria", "Universitaria", "Posgrado"])
+    }
 
-    # --- Cargar preguntas ---
+    # --- Cargar y mostrar preguntas ---
     preguntas_df = cargar_preguntas()
     respuestas = {}
+    preguntas_faltantes = []
 
-    # --- Mostrar preguntas ---
     st.markdown("### **Preguntas de la Encuesta**")
-    contador_respondidas = 0
-    for index, row in preguntas_df.iterrows():
+    for idx, row in preguntas_df.iterrows():
         pregunta = row['pregunta']
-        # Posibles respuestas separadas por ;
-        escala = row['escala'].split(';')
+        opciones = row['escala'].split(";")
+
         with st.container():
             st.markdown(
-                f"<div style='color: blue;'>**{index + 1}. {pregunta}**</div>", unsafe_allow_html=True)
-            respuesta = st.radio("", options=escala, key=f"pregunta_{
-                                 index}", index=None, horizontal=True)
-            respuestas[f"pregunta_{index}"] = respuesta
-            if respuesta:
-                contador_respondidas += 1
+                f"<div style='border: 2px solid #007bff; padding: 10px; border-radius: 5px; color: blue;'><b>{
+                    idx+1}. {pregunta}</b></div>",
+                unsafe_allow_html=True
+            )
+            respuesta = st.radio("", opciones, key=f"pregunta_{
+                                 idx}", index=None, horizontal=True)
+            respuestas[idx] = respuesta
 
-    # --- Contador de preguntas respondidas ---
-    st.info(f"Preguntas respondidas: {
-            contador_respondidas} / {len(preguntas_df)}")
+    # Contador de preguntas respondidas
+    respondidas = sum(1 for r in respuestas.values() if r)
+    total_preguntas = len(preguntas_df) + len(demograficos)
+    st.info(f"Preguntas respondidas: {respondidas} / {len(preguntas_df)}")
 
-    # --- Botón de enviar ---
-    enviar_btn = st.button("Enviar Encuesta")
-    if enviar_btn:
+    # --- Botón enviar ---
+    if st.button("Enviar Encuesta"):
         # Identificar preguntas no respondidas
-        faltantes = [k for k, v in respuestas.items() if not v]
-        if len(faltantes) == 0 and all(demograficos.values()):
-            st.success("¡Gracias por responder la encuesta!")
+        preguntas_faltantes = [idx+1 for idx, r in respuestas.items() if not r]
+
+        if all(demograficos.values()) and not preguntas_faltantes:
+            st.success("¡Gracias por participar en la encuesta!")
             st.balloons()
 
-            # Guardar respuestas en un archivo temporal
+            # Simular guardado en base de datos
             with open("respuestas_guardadas.txt", "w") as file:
-                file.write(f"ID Control: {
+                file.write(f"ID de Control: {
                            numero_control}\nFecha y Hora: {fecha_hora}\n")
-                file.write("Datos Demográficos:\n")
                 for k, v in demograficos.items():
                     file.write(f"{k}: {v}\n")
-                file.write("\nRespuestas de la Encuesta:\n")
-                for k, v in respuestas.items():
-                    file.write(f"{k}: {v}\n")
+                for idx, resp in respuestas.items():
+                    file.write(f"Pregunta {idx+1}: {resp}\n")
 
-            # Bloquear botón y finalizar
             st.stop()
+
         else:
-            st.error("Por favor, responda todas las preguntas antes de enviar.")
-            for k, v in respuestas.items():
-                if not v:
-                    st.markdown(f"<div style='color: red;'>Falta responder la pregunta: {
-                                int(k.split('_')[1]) + 1}</div>", unsafe_allow_html=True)
+            # Mostrar advertencias
+            if preguntas_faltantes:
+                for faltante in preguntas_faltantes:
+                    st.markdown(f"<div style='color: red;'>Falta responder la pregunta {
+                                faltante}</div>", unsafe_allow_html=True)
+
+            if not all(demograficos.values()):
+                st.error("Por favor, complete todos los datos demográficos.")
 
 
 # --- Ejecutar aplicación ---
