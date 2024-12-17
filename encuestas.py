@@ -47,15 +47,14 @@ df_preguntas = cargar_preguntas(url_preguntas)
 # Función para guardar respuestas en Firebase
 
 
-def guardar_respuestas(respuestas):
-    id_encuesta = f"ID_{generar_id()}"
+def guardar_respuestas(respuestas, id_encuesta):
     fecha = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     for pregunta_id, respuesta in respuestas.items():
         data = {'FECHA': fecha, 'RESPUESTA': respuesta}
         db.collection('respuestas').document(
             f"{id_encuesta}_{pregunta_id}").set(data)
 
-# Mostrar encuesta
+# Función para mostrar la encuesta
 
 
 def mostrar_encuesta():
@@ -136,9 +135,15 @@ def mostrar_encuesta():
                 st.write(f"❗ **Pregunta {num_pregunta}**",
                          unsafe_allow_html=True)
         else:
-            guardar_respuestas(respuestas)
+            # Guardar respuestas
+            id_encuesta = f"ID_{generar_id()}"
+            guardar_respuestas(respuestas, id_encuesta)
+
+            # Mostrar mensaje de agradecimiento
             st.success("¡Gracias por completar la encuesta!")
             st.balloons()
+
+            # Evitar que se vuelva a contestar
             st.stop()
 
     # Mostrar preguntas no respondidas en temporal rojo
