@@ -5,6 +5,8 @@ import datetime
 from firebase_admin import credentials, firestore, initialize_app, get_app
 import os
 import gc
+import qrcode
+from io import BytesIO
 from dotenv import load_dotenv
 
 # Cargar variables de entorno
@@ -72,6 +74,16 @@ def cerrar_conexion():
     # Confirmar el cierre
     print("Conexión cerrada y recursos liberados.")
 
+# Función para generar el QR del número de control
+
+
+def generar_qr(id_encuesta):
+    qr = qrcode.make(id_encuesta)
+    qr_io = BytesIO()
+    qr.save(qr_io)
+    qr_io.seek(0)
+    return qr_io
+
 # Función para mostrar la encuesta
 
 
@@ -89,6 +101,10 @@ def mostrar_encuesta():
     id_encuesta = f"ID_{generar_id()}"
     st.write(f"**Número de Control:** {id_encuesta}")
 
+    # Mostrar el código QR del número de control
+    qr_img = generar_qr(id_encuesta)
+    st.image(qr_img, caption="Número de Control (QR)")
+
     # Título e instrucciones en recuadro gris
     st.markdown("""
     <div style="background-color: #f0f0f0; padding: 10px; border-radius: 5px;">
@@ -98,8 +114,13 @@ def mostrar_encuesta():
     </div>
     """, unsafe_allow_html=True)
 
-    # Datos demográficos
-    st.header("Datos Demográficos")
+    # Datos demográficos en un solo recuadro azul
+    st.markdown("""
+    <div style="border: 2px solid blue; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
+    <h3>Datos Demográficos</h3>
+    </div>
+    """, unsafe_allow_html=True)
+
     respuestas = {}
     col1, col2 = st.columns(2)
     with col1:
