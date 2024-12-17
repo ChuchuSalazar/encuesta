@@ -30,13 +30,15 @@ def generar_id():
 # URL del archivo de preguntas
 url_preguntas = 'https://raw.githubusercontent.com/ChuchuSalazar/encuesta/main/preguntas.xlsx'
 
-# Función para cargar preguntas
+# Función para cargar preguntas con un spinner
 
 
 def cargar_preguntas(url):
-    df = pd.read_excel(url, header=0)
-    df['escala'] = pd.to_numeric(
-        df['escala'], errors='coerce').dropna().astype(int)
+    # Usamos st.spinner para mostrar mensaje de carga mientras cargamos los datos
+    with st.spinner('Cargando las preguntas...'):
+        df = pd.read_excel(url, header=0)
+        df['escala'] = pd.to_numeric(
+            df['escala'], errors='coerce').dropna().astype(int)
     return df
 
 
