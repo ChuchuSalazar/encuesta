@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import random
 import datetime
-from firebase_admin import credentials, initialize_app, db, get_app
+from firebase_admin import credentials, firestore, initialize_app, get_app
 import os
 from dotenv import load_dotenv
 
@@ -10,20 +10,17 @@ from dotenv import load_dotenv
 load_dotenv()
 FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS")
 
-# Inicializar Firebase, pero solo si no se ha inicializado previamente
+# Inicializar Firebase solo si no se ha inicializado previamente
 try:
     app = get_app()
 except ValueError as e:
     cred = credentials.Certificate(FIREBASE_CREDENTIALS)
-    app = initialize_app(cred, {
-        # Asegúrate de usar la URL correcta de tu Realtime Database
-        "databaseURL": "https://encuestas-pca-default-rtdb.firebaseio.com/"
-    })
+    app = initialize_app(cred)
 
-# Conectar a Realtime Database
-ref = db.reference("/respuestas")
+# Conectar a Firestore
+db = firestore.client()
 
-# Generar un ID único
+# Función para generar un ID único
 
 
 def generar_id():
@@ -33,11 +30,41 @@ def generar_id():
 # URL del archivo de preguntas
 url_preguntas = 'https://raw.githubusercontent.com/ChuchuSalazar/encuesta/main/preguntas.xlsx'
 
-# Cargar preguntas
-df_preguntas = pd.read_excel(url_preguntas, header=None)
-df_preguntas.columns = ['item', 'pregunta', 'escala', 'posibles_respuestas']
+# Función para cargar preguntas
 
-# Guardar respuestas en Realtime Database
+
+def cargar_preguntas(url):
+    try:
+        # Leer el archivo Excel y tomar la primera fila como encabezados
+        # header=0 indica que la primera fila son los nombres de columnas
+        df = pd.read_excel(url, header=0)
+
+        # Verificar que las columnas esperadas existan
+        columnas_esperadas = ['item', 'pregunta',
+                              'escala', 'posibles_respuestas']
+        if not all(col in df.columns for col in columnas_esperadas):
+            st.error(
+                "El archivo no contiene las columnas esperadas: 'item', 'pregunta', 'escala', 'posibles_respuestas'")
+            st.stop()
+
+        # Validar y limpiar la columna 'escala'
+        # Convierte 'escala' a numérico; NaN si falla
+        df['escala'] = pd.to_numeric(df['escala'], errors='coerce')
+        # Elimina filas donde 'escala' no es numérico
+        df = df.dropna(subset=['escala'])
+        # Asegura que 'escala' sea entero
+        df['escala'] = df['escala'].astype(int)
+
+        return df
+    except Exception as e:
+        st.error(f"Error al cargar las preguntas: {e}")
+        st.stop()
+
+
+# Cargar preguntas desde el archivo
+df_preguntas = cargar_preguntas(url_preguntas)
+
+# Función para guardar respuestas en Firebase
 
 
 def guardar_respuestas(respuestas):
@@ -48,85 +75,37 @@ def guardar_respuestas(respuestas):
     for key, value in respuestas.items():
         data[key] = value
 
-    # Guardar los datos en Realtime Database
-    ref.child(id_encuesta).set(data)
+    db.collection('respuestas').document(id_encuesta).set(data)
 
-# Mostrar mensaje emergente para advertencia de las preguntas
-
-
-def mostrar_mensaje_advertencia():
-    st.warning(
-        "Por favor, responda todas las preguntas antes de enviar la encuesta.")
-    if st.button("Aceptar"):
-        return True
-    return False
-
-# Mostrar encuesta
+# Función para mostrar la encuesta
 
 
 def mostrar_encuesta():
     st.title("Encuesta de Hábitos de Ahorro")
-    st.write("Por favor, complete todas las preguntas obligatorias.")
+    st.write("Por favor, responda todas las preguntas obligatorias.")
 
-    # Mostrar mensaje emergente de advertencia
-    if not mostrar_mensaje_advertencia():
-        return  # No se puede continuar hasta que el usuario acepte
-
-    # Diccionario para respuestas
+    # Diccionario para almacenar respuestas
     respuestas = {}
-    preguntas_faltantes = []  # Para rastrear preguntas sin responder
+    preguntas_faltantes = []  # Para rastrear preguntas sin respuesta
 
-    # Sección de preguntas demográficas
-    st.header("Datos Demográficos")
-
-    # Pregunta de sexo (Checklist con una opción seleccionable)
-    sexo = st.radio("¿Cuál es su sexo?", ("Masculino",
-                    "Femenino", "Otro"), key="sexo")
-    respuestas["sexo"] = sexo
-
-    # Pregunta de ciudad (Combo List)
-    ciudades = ["Caracas", "Maracaibo", "Valencia", "Barquisimeto", "Maracay"]
-    ciudad = st.selectbox("¿En qué ciudad reside?", ciudades, key="ciudad")
-    respuestas["ciudad"] = ciudad
-
-    # Pregunta de rango de edad (Checklist con un rango de opciones)
-    rango_edad = st.radio("¿Cuál es su rango de edad?", ("18-25",
-                          "26-35", "36-45", "46-60", "Más de 60"), key="rango_edad")
-    respuestas["rango_edad"] = rango_edad
-
-    # Pregunta de rango de ingreso (Checklist horizontal)
-    rango_ingreso = st.radio("¿En qué rango de ingresos se encuentra?", (
-        "Menos de 100 USD", "100-500 USD", "500-1000 USD", "Más de 1000 USD"), key="rango_ingreso")
-    respuestas["rango_ingreso"] = rango_ingreso
-
-    # Pregunta de nivel educativo (Checklist)
-    nivel_educativo = st.radio("¿Cuál es su nivel educativo?", ("Primaria",
-                               "Secundaria", "Técnico", "Universitario", "Posgrado"), key="nivel_educativo")
-    respuestas["nivel_educativo"] = nivel_educativo
-
-    # Sección de preguntas de la encuesta
+    # Sección de preguntas
     st.header("Preguntas de la Encuesta")
     for i, row in df_preguntas.iterrows():
-        # Esto debe ser el código del sesgo (AV, SQ, CM, DH)
         pregunta_id = row['item']
         pregunta_texto = row['pregunta']
         escala = int(row['escala'])
         opciones = row['posibles_respuestas'].split(',')[:escala]
 
-        # Inicializar el estilo de la pregunta
-        estilo_borde = f"2px solid blue"  # Borde azul por defecto
+        # Inicializar estilos
+        estilo_borde = f"2px solid blue"  # Azul por defecto
         texto_bold = ""
 
-        # Si la pregunta no ha sido respondida antes, añadir a respuestas
-        if pregunta_id not in respuestas:
-            respuestas[pregunta_id] = None
-
-        # Validación dinámica: marcar las preguntas sin respuesta
+        # Validar preguntas no respondidas
         if st.session_state.get(f"respuesta_{pregunta_id}", None) is None and pregunta_id in preguntas_faltantes:
-            estilo_borde = f"3px solid red"  # Borde rojo para preguntas no respondidas
-            texto_bold = "font-weight: bold;"  # Texto en negrita
+            estilo_borde = f"3px solid red"  # Borde rojo para preguntas sin respuesta
+            texto_bold = "font-weight: bold;"
 
-        # Mostrar la pregunta con estilo
+        # Mostrar pregunta con estilo
         st.markdown(
             f"""<div style="border: {estilo_borde}; padding: 10px; border-radius: 5px; {texto_bold}">
                     {pregunta_texto}
@@ -138,16 +117,16 @@ def mostrar_encuesta():
         respuesta = st.radio(
             f"Seleccione una opción para la Pregunta {i+1}:",
             opciones,
-            index=None,  # No hay selección por defecto
+            index=None,  # Sin selección predeterminada
             key=f"respuesta_{pregunta_id}",
         )
         respuestas[pregunta_id] = respuesta
 
-    # Botón para enviar
-    if st.button("Enviar", key="enviar_btn"):
+    # Botón para enviar respuestas
+    if st.button("Enviar"):
         preguntas_faltantes.clear()
 
-        # Validar respuestas
+        # Validar que todas las preguntas tengan respuesta
         for i, row in df_preguntas.iterrows():
             pregunta_id = row['item']
             if respuestas[pregunta_id] is None:
@@ -159,15 +138,11 @@ def mostrar_encuesta():
             for num_pregunta, _ in preguntas_faltantes:
                 st.write(f"❗ Pregunta {num_pregunta}")
         else:
-            # Guardar las respuestas en Realtime Database
+            # Guardar respuestas en Firebase
             guardar_respuestas(respuestas)
             st.success("¡Gracias por completar la encuesta!")
             st.balloons()
-
-            # Bloquear preguntas después del envío
             st.write("La encuesta ha sido enviada exitosamente.")
-            # Desactivar el botón de enviar
-            st.session_state["enviar_btn"] = True
             st.stop()
 
 
