@@ -3,6 +3,7 @@ import pandas as pd
 import random
 import qrcode
 from datetime import datetime
+import io
 
 # Función para generar el ID aleatorio de la encuesta
 
@@ -24,7 +25,12 @@ def generar_qr(data):
     qr.make(fit=True)
 
     img_qr = qr.make_image(fill='black', back_color='white')
-    return img_qr
+
+    # Convertir la imagen QR en un objeto BytesIO para usarlo en st.image()
+    img_byte_arr = io.BytesIO()
+    img_qr.save(img_byte_arr)
+    img_byte_arr.seek(0)  # Volver al inicio del flujo de bytes
+    return img_byte_arr
 
 # Leer las preguntas desde un archivo Excel (ajustar la ruta a tu archivo)
 
@@ -54,7 +60,7 @@ def mostrar_encuesta():
 
     # Generar el QR del ID de la encuesta
     qr_img = generar_qr(numero_control)
-    st.image(qr_img, width=100)
+    st.image(qr_img, width=100)  # Mostrar QR como imagen
 
     # Cargar las preguntas desde el archivo Excel
     preguntas_df = cargar_preguntas()
