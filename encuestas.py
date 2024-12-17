@@ -99,16 +99,16 @@ def mostrar_encuesta():
         escala = int(row['escala'])
         opciones = row['posibles_respuestas'].split(',')[:escala]
 
-        # Estilo de borde
-        estilo_borde = f"2px solid blue"  # Borde azul por defecto
+        # Estilo de borde inicial: azul
+        estilo_borde = f"2px solid blue"
         texto_bold = ""
 
         # Si la pregunta no ha sido respondida antes, añadir a respuestas
         if pregunta_id not in respuestas:
             respuestas[pregunta_id] = None
 
-        # Validación dinámica: marcar las preguntas sin respuesta en rojo
-        if not encuesta_enviada and respuestas.get(pregunta_id) is None:
+        # Validación dinámica: marcar las preguntas sin respuesta en rojo después de enviar
+        if encuesta_enviada and respuestas.get(pregunta_id) is None:
             estilo_borde = f"3px solid red"  # Borde rojo para preguntas no respondidas
             texto_bold = "font-weight: bold;"  # Texto en negrita
 
