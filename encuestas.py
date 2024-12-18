@@ -1,7 +1,28 @@
 import streamlit as st
+import pandas as pd
 import random
 import datetime
-import pandas as pd
+
+# Función para cargar las preguntas desde el archivo Excel
+
+
+def cargar_preguntas():
+    # Asegúrate de tener el archivo Excel con las columnas 'item', 'pregunta', 'escala' y 'posibles_respuestas'
+    archivo_preguntas = "preguntas.xlsx"  # Ruta de tu archivo Excel
+    df = pd.read_excel(archivo_preguntas)
+
+    preguntas = []
+    for index, row in df.iterrows():
+        pregunta = {
+            "item": row['item'],
+            "pregunta": row['pregunta'],
+            "escala": row['escala'],
+            # Separar las opciones si están en una cadena
+            "posibles_respuestas": row['posibles_respuestas'].split(',')
+        }
+        preguntas.append(pregunta)
+
+    return preguntas
 
 # Función para mostrar los datos demográficos
 
@@ -10,14 +31,18 @@ def mostrar_datos_demograficos():
     st.sidebar.header("Datos Demográficos")
 
     # Recuadro azul para los datos demográficos
-    # Usar 'expander' en lugar de 'beta_expander'
     with st.sidebar.expander("Datos Demográficos", expanded=True):
         sexo = st.radio("Sexo", ["Masculino", "Femenino"], key="sexo")
         edad = st.slider("Edad", 18, 100, 25)
         ciudad = st.selectbox("Ciudad", [
                               "Caracas", "Valencia", "Maracay", "Maracaibo", "Barquisimeto"], key="ciudad")
-        salario = st.multiselect("Rango de salario", [
-                                 "Menos de 1.000.000", "1.000.000 - 2.000.000", "Más de 2.000.000"], key="salario")
+
+        # Rango de salario como selección única
+        salario = st.selectbox("Rango de salario",
+                               ["1-100", "101-300", "301-600", "601-1000",
+                                "1001-1500", "1501-3500", "Más de 3500"],
+                               key="salario")
+
         nivel_educativo = st.selectbox("Nivel Educativo", [
                                        "Primaria", "Secundaria", "Técnico", "Universitario"], key="nivel_educativo")
 
@@ -26,22 +51,10 @@ def mostrar_datos_demograficos():
 # Función para mostrar las preguntas y opciones
 
 
-def mostrar_preguntas():
-    # Aquí se simulan las preguntas. Usualmente deberías leerlas de un archivo Excel.
-    preguntas = [
-        {"item": 1, "pregunta": "Prefiero evitar perder $100 que ganar $200.", "escala": 5, "posibles_respuestas": [
-            "Totalmente en desacuerdo", "En desacuerdo", "Neutral", "De acuerdo", "Totalmente de acuerdo"]},
-        {"item": 2, "pregunta": "Prefiero ganar $100 que perder $200.", "escala": 5, "posibles_respuestas": [
-            "Totalmente en desacuerdo", "En desacuerdo", "Neutral", "De acuerdo", "Totalmente de acuerdo"]},
-        {"item": 3, "pregunta": "Prefiero perder $100 que ganar $200.", "escala": 5, "posibles_respuestas": [
-            "Totalmente en desacuerdo", "En desacuerdo", "Neutral", "De acuerdo", "Totalmente de acuerdo"]},
-        # Añadir más preguntas aquí según el archivo Excel.
-    ]
-
+def mostrar_preguntas(preguntas):
     respuestas = {}
 
     for pregunta in preguntas:
-        # Cambié 'beta_expander' a 'expander'
         with st.expander(f"{pregunta['item']}. {pregunta['pregunta']}", expanded=True):
             opciones = pregunta["posibles_respuestas"]
             respuesta = st.radio(f"Selecciona una opción",
@@ -69,8 +82,11 @@ def app():
     # Mostrar datos demográficos
     sexo, edad, ciudad, salario, nivel_educativo = mostrar_datos_demograficos()
 
+    # Cargar las preguntas desde el archivo Excel
+    preguntas = cargar_preguntas()
+
     # Mostrar las preguntas
-    respuestas = mostrar_preguntas()
+    respuestas = mostrar_preguntas(preguntas)
 
     # Botón para enviar respuestas
     if st.button("Enviar"):
@@ -101,8 +117,7 @@ def app():
                 "sexo": sexo,
                 "edad": edad,
                 "ciudad": ciudad,
-                # Convertir lista de salarios seleccionados a cadena
-                "salario": ", ".join(salario),
+                "salario": salario,  # Salario como una cadena única
                 "nivel_educativo": nivel_educativo,
                 "respuestas": respuestas
             }
