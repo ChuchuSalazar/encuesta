@@ -16,6 +16,7 @@ def cargar_preguntas():
             "item": row['item'],
             "pregunta": row['pregunta'],
             "escala": row['escala'],
+            # Separar las opciones si están en una cadena
             "posibles_respuestas": row['posibles_respuestas'].split(',')
         }
         preguntas.append(pregunta)
@@ -59,11 +60,11 @@ def mostrar_preguntas(preguntas):
             respuesta = st.radio(f"Selecciona una opción",
                                  opciones, key=f"respuesta_{pregunta['item']}")
 
-            respuestas[pregunta["item"]] = respuesta
-
-            # Registrar preguntas no respondidas
-            if respuesta is None:
+            # Validación: Si no se responde, agregar a la lista de no respondidas
+            if not respuesta:
                 preguntas_no_respondidas.append(pregunta["item"])
+
+            respuestas[pregunta["item"]] = respuesta
 
     return respuestas, preguntas_no_respondidas
 
@@ -73,10 +74,6 @@ def mostrar_preguntas(preguntas):
 def app():
     # Título
     st.title("Encuesta de Tesis Doctoral")
-
-    # Mostrar fecha y hora
-    fecha_hora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    st.markdown(f"Fecha y Hora de inicio: {fecha_hora}")
 
     # Texto introductorio
     st.markdown(
@@ -96,20 +93,21 @@ def app():
     # Mostrar las preguntas
     respuestas, preguntas_no_respondidas = mostrar_preguntas(preguntas)
 
-    # Mostrar un contador de preguntas no respondidas
-    st.markdown(f"Preguntas Respondidas: {
-                len(respuestas) - len(preguntas_no_respondidas)} / {len(preguntas)}")
+    # Contador de preguntas no respondidas
+    contador_respuestas = len(respuestas) - len(preguntas_no_respondidas)
+    st.sidebar.write(f"Preguntas Respondidas: {
+                     contador_respuestas}/{len(preguntas)}")
 
     # Botón para enviar respuestas
     if st.button("Enviar"):
         if preguntas_no_respondidas:
-            # Si hay preguntas no respondidas, se marcan en rojo y se muestra mensaje
+            # Si hay preguntas no respondidas, se marcan en rojo
             for item in preguntas_no_respondidas:
                 st.markdown(f"<div style='border:2px solid red; border-radius:5px; padding:10px;'>Pregunta {
                             item} no respondida</div>", unsafe_allow_html=True)
             st.error("Por favor, responda todas las preguntas antes de enviar.")
         else:
-            # Si todas las preguntas están respondidas, mostrar un mensaje de agradecimiento
+            # Si todas las preguntas están respondidas
             st.success("Gracias por participar en la investigación.")
             st.balloons()
 
@@ -124,17 +122,19 @@ def app():
                 "sexo": sexo,
                 "edad": edad,
                 "ciudad": ciudad,
-                "salario": salario,  # Salario como una cadena única
+                "salario": salario,
                 "nivel_educativo": nivel_educativo,
                 "respuestas": respuestas
             }
 
             df = pd.DataFrame([data])
+            # Guardar en CSV como ejemplo
             df.to_csv(f"respuestas_encuesta_{encuesta_id}.csv", index=False)
 
             # Mostrar nueva página para evitar que se vuelva a contestar
             st.write(
                 "Encuesta enviada exitosamente. No puede ser respondida nuevamente.")
+            st.stop()  # Detiene la ejecución para no permitir más interacción
 
 
 # Ejecutar la aplicación
