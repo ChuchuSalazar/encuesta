@@ -41,10 +41,10 @@ def mostrar_encuesta():
         # Mostrar preguntas demográficas
         sexo = st.radio("Sexo:", ("Masculino", "Femenino"),
                         key="sexo", help="Selecciona tu sexo.")
-        edad = st.selectbox("Rango de edad:", [
-                            "18-25", "26-35", "36-45", "46-60", "60+"], key="edad")
-        salario = st.slider("Rango de salario:", 0, 1000000,
-                            (20000, 50000), step=5000, key="salario")
+        edad = st.multiselect(
+            "Rango de edad:", ["18-25", "26-35", "36-45", "46-60", "60+"], key="edad")
+        salario = st.multiselect("Rango de salario:", [
+                                 "0-20k", "20k-50k", "50k-100k", "100k+"], key="salario")
         ciudad = st.selectbox("Ciudad:", [
                               "Caracas", "Maracaibo", "Valencia", "Barquisimeto", "Maracay"], key="ciudad")
 
@@ -66,16 +66,23 @@ def mostrar_encuesta():
         key = f"pregunta_{index}"
 
         # Enmarcar las preguntas en un recuadro azul
-        with st.expander(pregunta, expanded=True):
+        with st.container():
+            st.markdown(f"""
+                <div style="background-color: lightblue; border-radius: 10px; padding: 10px;">
+                <h4>{index+1}. {pregunta}</h4>
+                """, unsafe_allow_html=True)
+
             respuesta = st.radio(pregunta, posibles_respuestas, key=key)
 
-        # Controlar las preguntas respondidas y no respondidas
-        if respuesta:
-            preguntas_respondidas.add(index)
-        else:
-            preguntas_no_respondidas.add(index)
+            # Controlar las preguntas respondidas y no respondidas
+            if respuesta:
+                preguntas_respondidas.add(index)
+            else:
+                preguntas_no_respondidas.add(index)
 
-        respuestas[index] = respuesta
+            respuestas[index] = respuesta
+
+            st.markdown("</div>", unsafe_allow_html=True)
 
     # Contar las preguntas respondidas
     total_preguntas = len(df_preguntas)
