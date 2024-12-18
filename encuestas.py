@@ -53,6 +53,7 @@ def mostrar_datos_demograficos():
 
 def mostrar_preguntas(preguntas):
     respuestas = {}
+    preguntas_no_respondidas = []
 
     for pregunta in preguntas:
         with st.expander(f"{pregunta['item']}. {pregunta['pregunta']}", expanded=True):
@@ -61,7 +62,11 @@ def mostrar_preguntas(preguntas):
                                  opciones, key=f"respuesta_{pregunta['item']}")
             respuestas[pregunta["item"]] = respuesta
 
-    return respuestas
+            # Registrar preguntas no respondidas
+            if respuesta is None:
+                preguntas_no_respondidas.append(pregunta["item"])
+
+    return respuestas, preguntas_no_respondidas
 
 # Función principal para mostrar la encuesta
 
@@ -86,17 +91,18 @@ def app():
     preguntas = cargar_preguntas()
 
     # Mostrar las preguntas
-    respuestas = mostrar_preguntas(preguntas)
+    respuestas, preguntas_no_respondidas = mostrar_preguntas(preguntas)
+
+    # Mostrar un contador de preguntas no respondidas
+    if preguntas_no_respondidas:
+        st.warning(f"Faltan responder {
+                   len(preguntas_no_respondidas)} preguntas.")
 
     # Botón para enviar respuestas
     if st.button("Enviar"):
-        # Validar si todas las preguntas han sido respondidas
-        respuestas_incompletas = [
-            item for item, respuesta in respuestas.items() if respuesta is None]
-
-        if respuestas_incompletas:
+        if preguntas_no_respondidas:
             # Si hay preguntas no respondidas, se marcan en rojo y se muestra mensaje
-            for item in respuestas_incompletas:
+            for item in preguntas_no_respondidas:
                 st.markdown(f"<div style='border:2px solid red; border-radius:5px; padding:10px;'>Pregunta {
                             item} no respondida</div>", unsafe_allow_html=True)
             st.error("Por favor, responda todas las preguntas antes de enviar.")
