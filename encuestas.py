@@ -1,35 +1,27 @@
 import streamlit as st
 import pandas as pd
-import random
-import datetime
+import firebase_admin
+from firebase_admin import credentials, db
 
-
-# Función para cargar las preguntas desde el archivo Excel
-def cargar_preguntas():
-    archivo_preguntas = "preguntas.xlsx"  # Ruta del archivo Excel
-    df = pd.read_excel(archivo_preguntas)
-
-    preguntas = []
-    for index, row in df.iterrows():
-        pregunta = {
-            "item": row['item'],
-            "pregunta": row['pregunta'],
-            "escala": row['escala'],
-            "posibles_respuestas": ["Selecciona una opción"] + row['posibles_respuestas'].split(',')
-        }
-        preguntas.append(pregunta)
-    return preguntas
-
+# Configuración de Firebase
+if not firebase_admin._apps:
+    # Cambia por la ruta de tu archivo JSON
+    cred = credentials.Certificate("ruta_a_tu_archivo_de_clave.json")
+    firebase_admin.initialize_app(
+        # Cambia por tu URL
+        cred, {'databaseURL': "https://tu-base-de-datos.firebaseio.com/"})
 
 # Función para mostrar los datos demográficos
+
+
 def mostrar_datos_demograficos():
     st.sidebar.header("Datos Demográficos")
 
-    # Recuadro azul para los datos demográficos
+    # Recuadro gris ajustado (ancho aumentado en un 25%)
     with st.sidebar.container():
         st.markdown(
             """
-            <div style="background-color:#add8e6; padding:10px; border-radius:5px;">
+            <div style="background-color:#f2f2f2; padding:15px; border-radius:5px; width:125%; margin-left:-10%; box-sizing:border-box;">
             <strong>Por favor complete los datos demográficos:</strong>
             </div>
             """, unsafe_allow_html=True)
@@ -46,110 +38,96 @@ def mostrar_datos_demograficos():
 
     return sexo, edad, ciudad, salario, nivel_educativo
 
+# Función para mostrar las preguntas del cuestionario
 
-# Función para mostrar las preguntas y opciones
-def mostrar_preguntas(preguntas, preguntas_no_respondidas):
-    st.markdown(
-        """
-        <div style="background-color:#f2f2f2; padding:10px; border-radius:5px;">
-        <strong>Responda las siguientes preguntas:</strong>
-        </div>
-        """, unsafe_allow_html=True)
 
+def mostrar_preguntas(preguntas):
     respuestas = {}
+    preguntas_no_respondidas = []
 
-    for pregunta in preguntas:
-        color_borde = "red" if pregunta["item"] in preguntas_no_respondidas else "black"
-        with st.container():
+    for i, row in preguntas.iterrows():
+        item = row['item']
+        pregunta = row['pregunta']
+        opciones = row['posibles_respuestas'].split(",")
+
+        # Inicializa la pregunta como no respondida
+        respuesta = st.radio(
+            f"{pregunta}", ["Selecciona una opción"] + opciones, key=f"pregunta_{item}")
+
+        # Colorea en rojo si no se ha respondido
+        if respuesta == "Selecciona una opción":
             st.markdown(
-                f"""
-                <div style="border: 2px solid {color_borde}; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
-                <strong>{pregunta['item']}. {pregunta['pregunta']}</strong>
-                </div>
-                """, unsafe_allow_html=True)
+                f'<div style="color: red; font-size: 12px;">Por favor responde esta pregunta</div>',
+                unsafe_allow_html=True,
+            )
+            preguntas_no_respondidas.append(item)
+        else:
+            respuestas[item] = respuesta
 
-            respuesta = st.radio(
-                "", options=pregunta["posibles_respuestas"], key=f"respuesta_{pregunta['item']}")
-            respuestas[pregunta["item"]] = respuesta
+    return respuestas, preguntas_no_respondidas
 
-    return respuestas
+# Validación y guardado en Firebase
 
 
-# Función principal para mostrar la encuesta
+def guardar_respuestas(datos_demograficos, respuestas):
+    data = {**datos_demograficos, **respuestas}
+    ref = db.reference("respuestas")
+    ref.push(data)
+    st.success("¡Respuestas enviadas con éxito!")
+
+# Función principal
+
+
 def app():
-    st.title("Encuesta de Tesis Doctoral")
-
-    # Fecha y hora del llenado de la encuesta
-    fecha_hora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    st.write(f"Fecha y hora de llenado: {fecha_hora}")
-
-    # Texto introductorio
+    st.title("Cuestionario")
     st.markdown(
-        """
-        <div style="background-color:#f2f2f2; padding:10px; border-radius:5px;">
-        <strong>Gracias por participar en esta encuesta.</strong><br>
-        La misma es anónima y tiene fines estrictamente académicos para una tesis doctoral.<br>
-        Lea cuidadosamente y seleccione la opción que considere pertinente. Al culminar, presione "Enviar".
-        </div>
-        """, unsafe_allow_html=True)
+        "<div style='text-align: right;'><img src='https://upload.wikimedia.org/wikipedia/commons/4/4a/Logo_UCAB.png' alt='Logo UCAB' width='150'/></div>",
+        unsafe_allow_html=True,
+    )
+    st.subheader("Por favor, responde todas las preguntas antes de enviar.")
 
-    # ID aleatorio para la encuesta
-    encuesta_id = random.randint(1000, 9999)
-    st.write(f"ID de Encuesta: {encuesta_id}")
+    # Carga de las preguntas desde un archivo Excel
+    preguntas_df = pd.DataFrame({
+        "item": [1, 2, 3, 4, 5],
+        "pregunta": [
+            "¿Qué tan satisfecho estás con tus hábitos de ahorro?",
+            "¿Sueles ahorrar de manera regular cada mes?",
+            "¿Te sientes cómodo manejando tu presupuesto mensual?",
+            "¿Ahorras con un propósito específico en mente?",
+            "¿Crees que podrías ahorrar más de lo que actualmente ahorras?"
+        ],
+        "posibles_respuestas": [
+            "Muy insatisfecho,Insatisfecho,Neutral,Satisfecho,Muy satisfecho",
+            "Nunca,Rara vez,A veces,A menudo,Siempre",
+            "Nada cómodo,Poco cómodo,Neutral,Bastante cómodo,Muy cómodo",
+            "Nunca,Rara vez,A veces,A menudo,Siempre",
+            "Totalmente en desacuerdo,En desacuerdo,Neutral,De acuerdo,Totalmente de acuerdo"
+        ]
+    })
 
     # Mostrar datos demográficos
     sexo, edad, ciudad, salario, nivel_educativo = mostrar_datos_demograficos()
+    datos_demograficos = {
+        "sexo": sexo,
+        "edad": edad,
+        "ciudad": ciudad,
+        "salario": salario,
+        "nivel_educativo": nivel_educativo
+    }
 
-    # Validar datos demográficos
-    if sexo == "Selecciona una opción" or ciudad == "Selecciona una opción" or salario == "Selecciona una opción" or nivel_educativo == "Selecciona una opción":
-        st.warning(
-            "Por favor complete todos los datos demográficos antes de continuar.")
-        return
-
-    # Cargar las preguntas desde el archivo Excel
-    preguntas = cargar_preguntas()
-
-    # Lista de preguntas no respondidas (almacena IDs de las preguntas)
-    if "preguntas_no_respondidas" not in st.session_state:
-        st.session_state.preguntas_no_respondidas = [
-            pregunta["item"] for pregunta in preguntas]
-
-    # Mostrar las preguntas
-    respuestas = mostrar_preguntas(
-        preguntas, st.session_state.preguntas_no_respondidas)
+    # Mostrar preguntas
+    st.subheader("Preguntas del cuestionario")
+    respuestas, preguntas_no_respondidas = mostrar_preguntas(preguntas_df)
 
     # Botón para enviar respuestas
     if st.button("Enviar"):
-        # Identificar preguntas no respondidas
-        st.session_state.preguntas_no_respondidas = [
-            item for item, respuesta in respuestas.items() if respuesta == "Selecciona una opción"
-        ]
-
-        if st.session_state.preguntas_no_respondidas:
-            st.warning(
-                f"Faltan responder {len(st.session_state.preguntas_no_respondidas)
-                                    } preguntas. Por favor, complételas antes de enviar."
-            )
+        if "Selecciona una opción" in datos_demograficos.values():
+            st.error("Por favor, completa todos los campos de datos demográficos.")
+        elif preguntas_no_respondidas:
+            st.error("Por favor, responde todas las preguntas antes de enviar.")
         else:
-            st.success("Gracias por participar en la investigación.")
-            st.balloons()
-
-            # Guardar las respuestas en un archivo o base de datos
-            data = {
-                "id_encuesta": encuesta_id,
-                "fecha_hora": fecha_hora,
-                "sexo": sexo,
-                "edad": edad,
-                "ciudad": ciudad,
-                "salario": salario,
-                "nivel_educativo": nivel_educativo,
-                "respuestas": respuestas
-            }
-            df = pd.DataFrame([data])
-            df.to_csv(f"respuestas_encuesta_{encuesta_id}.csv", index=False)
-            st.write("Encuesta enviada exitosamente.")
+            guardar_respuestas(datos_demograficos, respuestas)
 
 
-# Ejecutar la aplicación
 if __name__ == "__main__":
     app()
