@@ -15,7 +15,7 @@ def cargar_preguntas():
             "item": row['item'],
             "pregunta": row['pregunta'],
             "escala": row['escala'],
-            "posibles_respuestas": row['posibles_respuestas'].split(',')
+            "posibles_respuestas": ["Selecciona una opción"] + row['posibles_respuestas'].split(',')
         }
         preguntas.append(pregunta)
     return preguntas
@@ -35,14 +35,14 @@ def mostrar_datos_demograficos():
             """, unsafe_allow_html=True)
 
         sexo = st.radio(
-            "Sexo:", ["Masculino", "Femenino"], index=-1, key="sexo")
+            "Sexo:", ["Selecciona una opción", "Masculino", "Femenino"], key="sexo")
         edad = st.slider("Edad:", 18, 100, 25, key="edad")
-        ciudad = st.selectbox("Ciudad:", [
-            "Caracas", "Valencia", "Maracay", "Maracaibo", "Barquisimeto"], key="ciudad")
+        ciudad = st.selectbox("Ciudad:", ["Selecciona una opción", "Caracas",
+                              "Valencia", "Maracay", "Maracaibo", "Barquisimeto"], key="ciudad")
         salario = st.selectbox("Rango de salario:", [
-            "1-100", "101-300", "301-600", "601-1000", "1001-1500", "1501-3500", "Más de 3500"], index=0, key="salario")
+                               "Selecciona una opción", "1-100", "101-300", "301-600", "601-1000", "1001-1500", "1501-3500", "Más de 3500"], key="salario")
         nivel_educativo = st.radio("Nivel Educativo:", [
-            "Primaria", "Secundaria", "Técnico", "Universitario"], index=-1, key="nivel_educativo")
+                                   "Selecciona una opción", "Primaria", "Secundaria", "Técnico", "Universitario"], key="nivel_educativo")
 
     return sexo, edad, ciudad, salario, nivel_educativo
 
@@ -68,13 +68,13 @@ def mostrar_preguntas(preguntas):
                 </div>
                 """, unsafe_allow_html=True)
 
-            respuesta = st.radio("", options=pregunta["posibles_respuestas"],
-                                 index=-1, key=f"respuesta_{pregunta['item']}")
+            respuesta = st.radio(
+                "", options=pregunta["posibles_respuestas"], key=f"respuesta_{pregunta['item']}")
+
+            if respuesta == "Selecciona una opción":
+                preguntas_no_respondidas.append(pregunta["item"])
 
             respuestas[pregunta["item"]] = respuesta
-
-            if not respuesta:  # Si no hay respuesta seleccionada
-                preguntas_no_respondidas.append(pregunta["item"])
 
     return respuestas, preguntas_no_respondidas
 
@@ -103,6 +103,12 @@ def app():
 
     # Mostrar datos demográficos
     sexo, edad, ciudad, salario, nivel_educativo = mostrar_datos_demograficos()
+
+    # Validar datos demográficos
+    if sexo == "Selecciona una opción" or ciudad == "Selecciona una opción" or salario == "Selecciona una opción" or nivel_educativo == "Selecciona una opción":
+        st.warning(
+            "Por favor complete todos los datos demográficos antes de continuar.")
+        return
 
     # Cargar las preguntas desde el archivo Excel
     preguntas = cargar_preguntas()
