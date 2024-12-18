@@ -48,7 +48,7 @@ def mostrar_datos_demograficos():
 
 
 # Función para mostrar las preguntas y opciones
-def mostrar_preguntas(preguntas):
+def mostrar_preguntas(preguntas, preguntas_no_respondidas):
     st.markdown(
         """
         <div style="background-color:#f2f2f2; padding:10px; border-radius:5px;">
@@ -57,26 +57,22 @@ def mostrar_preguntas(preguntas):
         """, unsafe_allow_html=True)
 
     respuestas = {}
-    preguntas_no_respondidas = []
 
     for pregunta in preguntas:
+        color_borde = "red" if pregunta["item"] in preguntas_no_respondidas else "black"
         with st.container():
             st.markdown(
                 f"""
-                <div style="background-color:#add8e6; padding:10px; border-radius:5px; margin-bottom:10px;">
+                <div style="border: 2px solid {color_borde}; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
                 <strong>{pregunta['item']}. {pregunta['pregunta']}</strong>
                 </div>
                 """, unsafe_allow_html=True)
 
             respuesta = st.radio(
                 "", options=pregunta["posibles_respuestas"], key=f"respuesta_{pregunta['item']}")
-
-            if respuesta == "Selecciona una opción":
-                preguntas_no_respondidas.append(pregunta["item"])
-
             respuestas[pregunta["item"]] = respuesta
 
-    return respuestas, preguntas_no_respondidas
+    return respuestas
 
 
 # Función principal para mostrar la encuesta
@@ -113,25 +109,27 @@ def app():
     # Cargar las preguntas desde el archivo Excel
     preguntas = cargar_preguntas()
 
-    # Mostrar las preguntas
-    respuestas, preguntas_no_respondidas = mostrar_preguntas(preguntas)
+    # Lista de preguntas no respondidas (almacena IDs de las preguntas)
+    if "preguntas_no_respondidas" not in st.session_state:
+        st.session_state.preguntas_no_respondidas = [
+            pregunta["item"] for pregunta in preguntas]
 
-    # Contador de preguntas respondidas
-    total_preguntas = len(preguntas)
-    preguntas_respondidas = total_preguntas - len(preguntas_no_respondidas)
-    st.markdown(
-        f"**Preguntas respondidas: {preguntas_respondidas}/{total_preguntas}**")
+    # Mostrar las preguntas
+    respuestas = mostrar_preguntas(
+        preguntas, st.session_state.preguntas_no_respondidas)
 
     # Botón para enviar respuestas
     if st.button("Enviar"):
-        if preguntas_no_respondidas:
-            st.error(
-                f"Faltan responder {len(preguntas_no_respondidas)} preguntas. Revise los números: {preguntas_no_respondidas}.")
-            for item in preguntas_no_respondidas:
-                st.markdown(
-                    f"<div style='border:2px solid red; border-radius:5px; padding:10px;'>Pregunta {
-                        item} no respondida</div>",
-                    unsafe_allow_html=True)
+        # Identificar preguntas no respondidas
+        st.session_state.preguntas_no_respondidas = [
+            item for item, respuesta in respuestas.items() if respuesta == "Selecciona una opción"
+        ]
+
+        if st.session_state.preguntas_no_respondidas:
+            st.warning(
+                f"Faltan responder {len(st.session_state.preguntas_no_respondidas)
+                                    } preguntas. Por favor, complételas antes de enviar."
+            )
         else:
             st.success("Gracias por participar en la investigación.")
             st.balloons()
