@@ -1,13 +1,15 @@
 import os
 import firebase_admin
-from firebase_admin import credentials, firestore
+from firebase_admin import credentials, firestore, initialize_app, get_app
 import pandas as pd
 import streamlit as st
 import random
 import datetime
 import json
+from dotenv import load_dotenv
 
 # Cargar las credenciales de Firebase desde la variable de entorno
+load_dotenv()  # Asegurarse de que el archivo .env sea cargado
 FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS")
 
 # Verificar si se ha establecido correctamente la variable de entorno
@@ -16,10 +18,16 @@ if FIREBASE_CREDENTIALS is None:
         "La variable de entorno FIREBASE_CREDENTIALS no está configurada.")
 
 # Inicializar Firebase con el archivo de credenciales
-cred = credentials.Certificate(FIREBASE_CREDENTIALS)
-firebase_admin.initialize_app(cred)
+try:
+    app = get_app()
+except ValueError:
+    cred = credentials.Certificate(FIREBASE_CREDENTIALS)
+    app = initialize_app(cred)
+    cred = credentials.Certificate(FIREBASE_CREDENTIALS)
+    firebase_admin.initialize_app(cred)
 
 # Obtener la referencia a la base de datos Firestore
+
 db = firestore.client()
 
 # Cargar preguntas desde el archivo Excel
