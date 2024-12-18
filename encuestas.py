@@ -17,17 +17,14 @@ if FIREBASE_CREDENTIALS is None:
     raise ValueError(
         "La variable de entorno FIREBASE_CREDENTIALS no está configurada.")
 
-# Inicializar Firebase con el archivo de credenciales
-try:
-    app = get_app()
-except ValueError:
+# Inicializar Firebase con el archivo de credenciales si no está inicializado
+if not firebase_admin._apps:
     cred = credentials.Certificate(FIREBASE_CREDENTIALS)
     app = initialize_app(cred)
-    cred = credentials.Certificate(FIREBASE_CREDENTIALS)
-    firebase_admin.initialize_app(cred)
+else:
+    app = get_app()  # Obtener la aplicación existente
 
 # Obtener la referencia a la base de datos Firestore
-
 db = firestore.client()
 
 # Cargar preguntas desde el archivo Excel
