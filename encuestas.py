@@ -7,7 +7,6 @@ import datetime
 
 
 def cargar_preguntas():
-    # Asegúrate de tener el archivo Excel con las columnas 'item', 'pregunta', 'escala' y 'posibles_respuestas'
     archivo_preguntas = "preguntas.xlsx"  # Ruta de tu archivo Excel
     df = pd.read_excel(archivo_preguntas)
 
@@ -17,7 +16,6 @@ def cargar_preguntas():
             "item": row['item'],
             "pregunta": row['pregunta'],
             "escala": row['escala'],
-            # Separar las opciones si están en una cadena
             "posibles_respuestas": row['posibles_respuestas'].split(',')
         }
         preguntas.append(pregunta)
@@ -60,6 +58,7 @@ def mostrar_preguntas(preguntas):
             opciones = pregunta["posibles_respuestas"]
             respuesta = st.radio(f"Selecciona una opción",
                                  opciones, key=f"respuesta_{pregunta['item']}")
+
             respuestas[pregunta["item"]] = respuesta
 
             # Registrar preguntas no respondidas
@@ -74,6 +73,10 @@ def mostrar_preguntas(preguntas):
 def app():
     # Título
     st.title("Encuesta de Tesis Doctoral")
+
+    # Mostrar fecha y hora
+    fecha_hora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    st.markdown(f"Fecha y Hora de inicio: {fecha_hora}")
 
     # Texto introductorio
     st.markdown(
@@ -94,9 +97,8 @@ def app():
     respuestas, preguntas_no_respondidas = mostrar_preguntas(preguntas)
 
     # Mostrar un contador de preguntas no respondidas
-    if preguntas_no_respondidas:
-        st.warning(f"Faltan responder {
-                   len(preguntas_no_respondidas)} preguntas.")
+    st.markdown(f"Preguntas Respondidas: {
+                len(respuestas) - len(preguntas_no_respondidas)} / {len(preguntas)}")
 
     # Botón para enviar respuestas
     if st.button("Enviar"):
@@ -112,7 +114,6 @@ def app():
             st.balloons()
 
             # Guardar las respuestas en un archivo o base de datos (esto lo harás según tus necesidades)
-            # ID aleatorio para la encuesta
             encuesta_id = random.randint(1000, 9999)
             fecha_hora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -129,7 +130,6 @@ def app():
             }
 
             df = pd.DataFrame([data])
-            # Guardar en CSV como ejemplo
             df.to_csv(f"respuestas_encuesta_{encuesta_id}.csv", index=False)
 
             # Mostrar nueva página para evitar que se vuelva a contestar
