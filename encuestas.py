@@ -38,7 +38,8 @@ def mostrar_encuesta():
         st.subheader(f"Fecha y hora: {fecha_hora}")
         st.write(f"**Número de Control:** {numero_control}")
     with col2:
-        st.image("logo_ucab.jpg", use_column_width=True)
+        # Actualizado para evitar la advertencia
+        st.image("logo_ucab.jpg", use_container_width=True)
 
     # --- CSS Personalizado ---
     st.markdown("""
@@ -71,12 +72,30 @@ def mostrar_encuesta():
             .radio label {
                 margin-right: 10px;
             }
+            .boton-sexo {
+                display: flex;
+                justify-content: space-evenly;
+                gap: 5px;
+                align-items: center;
+            }
+            .red-border {
+                border: 2px solid red;
+                padding: 10px;
+                border-radius: 5px;
+                margin-bottom: 10px;
+            }
+            .blue-border {
+                border: 2px solid blue;
+                padding: 10px;
+                border-radius: 5px;
+                margin-bottom: 10px;
+            }
         </style>
     """, unsafe_allow_html=True)
 
-    # --- Marco Azul Claro para Datos Demográficos ---
+    # --- Marco Azul Claro para Información General ---
     st.markdown('<div class="marco-azul">', unsafe_allow_html=True)
-    st.markdown('<div class="titulo">Datos Demográficos</div>',
+    st.markdown('<div class="titulo">Información General</div>',
                 unsafe_allow_html=True)
 
     # --- Datos Demográficos ---
@@ -112,7 +131,9 @@ def mostrar_encuesta():
 
     # Ciudad
     st.markdown("**Ciudad de residencia:**")
-    ciudad = st.text_input("Ciudad:", "Caracas")
+    ciudades = ["Caracas", "Maracaibo", "Valencia",
+                "Barquisimeto", "Mérida", "San Cristóbal"]
+    ciudad = st.selectbox("Selecciona tu ciudad:", opciones=ciudades, index=0)
 
     st.markdown("</div>", unsafe_allow_html=True)  # Cerrar marco azul
 
@@ -129,9 +150,15 @@ def mostrar_encuesta():
                 continue
 
             pregunta = row['pregunta']
-            # Asegúrate de que 'posibles respuestas' esté bien tratado
-            posibles_respuestas = str(row['posibles respuestas']).split(
-                ",")  # Convertir a cadena antes de aplicar split()
+
+            # Validar si la columna 'posibles respuestas' existe
+            if 'posibles respuestas' in row:
+                posibles_respuestas = str(row['posibles respuestas']).split(
+                    ",")  # Convertir a cadena antes de aplicar split()
+            else:
+                st.error(f"Error: La columna 'posibles respuestas' no se encuentra en la fila {
+                         index + 1}")
+                continue
 
             # Si la escala es mayor que 1, mostrar un radio button con las respuestas posibles
             with st.container():
@@ -161,6 +188,9 @@ def mostrar_encuesta():
                 st.success("¡Gracias por responder la encuesta!")
                 st.balloons()
             else:
+                for faltante in faltantes:
+                    st.markdown(f"<div class='red-border'><strong>{
+                                faltante}</strong> está incompleta.</div>", unsafe_allow_html=True)
                 st.error(
                     "Por favor, responda todas las preguntas y complete los datos demográficos.")
 
