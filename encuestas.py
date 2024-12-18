@@ -90,8 +90,16 @@ def app():
 
     # Panel derecho para las preguntas
     with col2:
+        # Título principal de la encuesta
+        st.title("Encuesta")
+
+        # Generar el número de control y mostrarlo de forma constante
+        if "nro_control" not in st.session_state:
+            st.session_state.nro_control = generar_id_encuesta()
+
+        # Mostrar la fecha y el número de control, manteniendo constante el nro_control
         st.markdown(f"### Fecha y hora: {obtener_fecha_hora()}")
-        st.markdown(f"### Número de control: {generar_id_encuesta()}")
+        st.markdown(f"### Número de control: {st.session_state.nro_control}")
 
         # Cargar las preguntas
         preguntas = cargar_preguntas()
@@ -128,7 +136,8 @@ def app():
         # Botón para enviar los datos
         if st.button("Enviar Encuesta"):
             # Obtener el ID único para la encuesta
-            id_encuesta = generar_id_encuesta()
+            # Usar el número de control constante
+            id_encuesta = st.session_state.nro_control
 
             # Crear un objeto de datos que incluirá la información general y las respuestas
             data = {**info_general, **respuestas}
