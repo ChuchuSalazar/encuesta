@@ -58,7 +58,8 @@ def mostrar_preguntas(preguntas):
         with st.expander(f"{pregunta['item']}. {pregunta['pregunta']}", expanded=True):
             opciones = pregunta["posibles_respuestas"]
             respuesta = st.radio(f"Selecciona una opción",
-                                 opciones, key=f"respuesta_{pregunta['item']}")
+                                 # Esto asegura que las opciones estén desmarcadas
+                                 opciones, key=f"respuesta_{pregunta['item']}", index=-1)
 
             # Validación: Si no se responde, agregar a la lista de no respondidas
             if not respuesta:
