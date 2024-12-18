@@ -35,9 +35,9 @@ def cargar_preguntas():
         preguntas = []
         for _, row in df.iterrows():
             pregunta = {
-                "item": row['ITEM'],
-                "pregunta": row['PREGUNTA'],
-                "escala": row['ESCALA'],
+                "item": row['item'],
+                "pregunta": row['pregunta'],
+                "escala": row['escala'],
                 "posibles_respuestas": ["Selecciona una opción"] + row['posibles_respuestas'].split(',')
             }
             preguntas.append(pregunta)
