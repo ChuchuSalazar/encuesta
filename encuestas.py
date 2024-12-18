@@ -2,9 +2,16 @@ import streamlit as st
 import pandas as pd
 import random
 import datetime
+from firebase_admin import credentials, firestore, initialize_app
 
+# Inicializar Firebase
+cred = credentials.Certificate("path/to/your/serviceAccountKey.json")
+initialize_app(cred)
+db = firestore.client()
 
 # Función para cargar las preguntas desde el archivo Excel
+
+
 def cargar_preguntas():
     archivo_preguntas = "preguntas.xlsx"  # Ruta del archivo Excel
     df = pd.read_excel(archivo_preguntas)
@@ -20,13 +27,14 @@ def cargar_preguntas():
         preguntas.append(pregunta)
     return preguntas
 
-
 # Función para mostrar los datos demográficos
+
+
 def mostrar_datos_demograficos():
     st.sidebar.header("Datos Demográficos")
 
     # Recuadro azul para los datos demográficos
-    with st.sidebar.container():
+    with st.sidebar:
         st.markdown(
             """
             <div style="background-color:#add8e6; padding:10px; border-radius:5px;">
@@ -36,18 +44,22 @@ def mostrar_datos_demograficos():
 
         sexo = st.radio(
             "Sexo:", ["Selecciona una opción", "Masculino", "Femenino"], key="sexo")
-        edad = st.slider("Edad:", 18, 100, 25, key="edad")
-        ciudad = st.selectbox("Ciudad:", ["Selecciona una opción", "Caracas",
-                              "Valencia", "Maracay", "Maracaibo", "Barquisimeto"], key="ciudad")
-        salario = st.selectbox("Rango de salario:", [
-                               "Selecciona una opción", "1-100", "101-300", "301-600", "601-1000", "1001-1500", "1501-3500", "Más de 3500"], key="salario")
+        edad = st.selectbox("Rango de Edad:", [
+                            "Selecciona una opción", "18-24", "25-34", "35-44", "45-54", "55+"], key="edad")
+        ciudad = st.selectbox("Ciudad:", [
+                              "Caracas", "Valencia", "Maracay", "Maracaibo", "Barquisimeto"], key="ciudad")
+        salario = st.selectbox("Rango de Salario:", [
+            "Selecciona una opción", "1-100", "101-300", "301-600", "601-1000", "1001-1500", "1501-3500", "Más de 3500"
+        ], key="salario")
         nivel_educativo = st.radio("Nivel Educativo:", [
-                                   "Selecciona una opción", "Primaria", "Secundaria", "Técnico", "Universitario"], key="nivel_educativo")
+            "Selecciona una opción", "Primaria", "Secundaria", "Técnico", "Universitario"
+        ], key="nivel_educativo")
 
     return sexo, edad, ciudad, salario, nivel_educativo
 
-
 # Función para mostrar las preguntas y opciones
+
+
 def mostrar_preguntas(preguntas):
     st.markdown(
         """
@@ -78,14 +90,19 @@ def mostrar_preguntas(preguntas):
 
     return respuestas, preguntas_no_respondidas
 
-
 # Función principal para mostrar la encuesta
+
+
 def app():
     st.title("Encuesta de Tesis Doctoral")
 
     # Fecha y hora del llenado de la encuesta
     fecha_hora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     st.write(f"Fecha y hora de llenado: {fecha_hora}")
+
+    # ID aleatorio para la encuesta
+    encuesta_id = random.randint(1000, 9999)
+    st.write(f"ID de Encuesta: {encuesta_id}")
 
     # Texto introductorio
     st.markdown(
@@ -96,10 +113,6 @@ def app():
         Lea cuidadosamente y seleccione la opción que considere pertinente. Al culminar, presione "Enviar".
         </div>
         """, unsafe_allow_html=True)
-
-    # ID aleatorio para la encuesta
-    encuesta_id = random.randint(1000, 9999)
-    st.write(f"ID de Encuesta: {encuesta_id}")
 
     # Mostrar datos demográficos
     sexo, edad, ciudad, salario, nivel_educativo = mostrar_datos_demograficos()
@@ -136,19 +149,23 @@ def app():
             st.success("Gracias por participar en la investigación.")
             st.balloons()
 
-            # Guardar las respuestas en un archivo o base de datos
+            # Guardar las respuestas en Firestore
             data = {
-                "id_encuesta": encuesta_id,
-                "fecha_hora": fecha_hora,
-                "sexo": sexo,
-                "edad": edad,
-                "ciudad": ciudad,
-                "salario": salario,
-                "nivel_educativo": nivel_educativo,
-                "respuestas": respuestas
+                "ID": encuesta_id,
+                "FECHA": fecha_hora,
+                "SEXO": sexo,
+                "RANGO_EDA": edad,
+                "RANGO_INGRESO": salario,
+                "CIUDAD": ciudad,
+                "NIVEL_PROF": nivel_educativo,
             }
-            df = pd.DataFrame([data])
-            df.to_csv(f"respuestas_encuesta_{encuesta_id}.csv", index=False)
+
+            # Agregar respuestas de las preguntas
+            for key, value in respuestas.items():
+                data[key] = value
+
+            db.collection("encuestas").document(str(encuesta_id)).set(data)
+
             st.write("Encuesta enviada exitosamente.")
 
 
