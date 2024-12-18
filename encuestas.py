@@ -7,6 +7,7 @@ import datetime
 
 
 def cargar_preguntas():
+    # Asegúrate de tener el archivo Excel con las columnas 'item', 'pregunta', 'escala' y 'posibles_respuestas'
     archivo_preguntas = "preguntas.xlsx"  # Ruta de tu archivo Excel
     df = pd.read_excel(archivo_preguntas)
 
@@ -57,9 +58,9 @@ def mostrar_preguntas(preguntas):
     for pregunta in preguntas:
         with st.expander(f"{pregunta['item']}. {pregunta['pregunta']}", expanded=True):
             opciones = pregunta["posibles_respuestas"]
+            # Aquí no se asigna un índice, por lo que las preguntas inician sin respuesta seleccionada
             respuesta = st.radio(f"Selecciona una opción",
-                                 # Esto asegura que las opciones estén desmarcadas
-                                 opciones, key=f"respuesta_{pregunta['item']}", index=-1)
+                                 opciones, key=f"respuesta_{pregunta['item']}")
 
             # Validación: Si no se responde, agregar a la lista de no respondidas
             if not respuesta:
@@ -94,25 +95,26 @@ def app():
     # Mostrar las preguntas
     respuestas, preguntas_no_respondidas = mostrar_preguntas(preguntas)
 
-    # Contador de preguntas no respondidas
-    contador_respuestas = len(respuestas) - len(preguntas_no_respondidas)
-    st.sidebar.write(f"Preguntas Respondidas: {
-                     contador_respuestas}/{len(preguntas)}")
+    # Mostrar un contador de preguntas no respondidas
+    if preguntas_no_respondidas:
+        st.warning(f"Faltan responder {
+                   len(preguntas_no_respondidas)} preguntas.")
 
     # Botón para enviar respuestas
     if st.button("Enviar"):
         if preguntas_no_respondidas:
-            # Si hay preguntas no respondidas, se marcan en rojo
+            # Si hay preguntas no respondidas, se marcan en rojo y se muestra mensaje
             for item in preguntas_no_respondidas:
                 st.markdown(f"<div style='border:2px solid red; border-radius:5px; padding:10px;'>Pregunta {
                             item} no respondida</div>", unsafe_allow_html=True)
             st.error("Por favor, responda todas las preguntas antes de enviar.")
         else:
-            # Si todas las preguntas están respondidas
+            # Si todas las preguntas están respondidas, mostrar un mensaje de agradecimiento
             st.success("Gracias por participar en la investigación.")
             st.balloons()
 
             # Guardar las respuestas en un archivo o base de datos (esto lo harás según tus necesidades)
+            # ID aleatorio para la encuesta
             encuesta_id = random.randint(1000, 9999)
             fecha_hora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -123,7 +125,7 @@ def app():
                 "sexo": sexo,
                 "edad": edad,
                 "ciudad": ciudad,
-                "salario": salario,
+                "salario": salario,  # Salario como una cadena única
                 "nivel_educativo": nivel_educativo,
                 "respuestas": respuestas
             }
@@ -135,7 +137,6 @@ def app():
             # Mostrar nueva página para evitar que se vuelva a contestar
             st.write(
                 "Encuesta enviada exitosamente. No puede ser respondida nuevamente.")
-            st.stop()  # Detiene la ejecución para no permitir más interacción
 
 
 # Ejecutar la aplicación
