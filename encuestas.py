@@ -2,167 +2,153 @@ import streamlit as st
 import pandas as pd
 import random
 import datetime
-from firebase_admin import credentials, firestore, initialize_app, get_app
-import os
-from dotenv import load_dotenv
+import firebase_admin
+from firebase_admin import credentials, firestore
 
-# Cargar variables de entorno
-load_dotenv()  # Asegurarse de que el archivo .env sea cargado
-FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS")
+# Iniciar la conexión con Firebase
+# Asegúrate de usar la ruta correcta
+cred = credentials.Certificate("ruta/a/tu/archivo/firebase.json")
+firebase_admin.initialize_app(cred)
 
-if not FIREBASE_CREDENTIALS:
-    st.error(
-        "Error: No se encontró la credencial de Firebase. Verifica tu archivo .env.")
-    st.stop()
-
-# Inicializar Firebase, pero solo si no se ha inicializado previamente
-try:
-    app = get_app()
-except ValueError:
-    cred = credentials.Certificate(FIREBASE_CREDENTIALS)
-    app = initialize_app(cred)
-
-# Conectar a Firestore
+# Referencia a Firestore
 db = firestore.client()
 
-# Función para cargar las preguntas desde el archivo Excel
+# Cargar las preguntas desde el archivo Excel
 
 
 def cargar_preguntas():
-    archivo_preguntas = "preguntas.xlsx"  # Ruta del archivo Excel
-    try:
-        df = pd.read_excel(archivo_preguntas)
-        preguntas = []
-        for _, row in df.iterrows():
-            pregunta = {
-                "item": row['item'],
-                "pregunta": row['pregunta'],
-                "escala": row['escala'],
-                "posibles_respuestas": ["Selecciona una opción"] + row['posibles_respuestas'].split(',')
-            }
-            preguntas.append(pregunta)
-        return preguntas
-    except FileNotFoundError:
-        st.error(f"Error: No se encontró el archivo {
-                 archivo_preguntas}. Verifica su existencia.")
-        st.stop()
+    # Leer el archivo Excel
+    df = pd.read_excel("preguntas.xlsx")
 
-# Función para mostrar los datos demográficos
+    # Ajustar las columnas a minúsculas
+    # Convertir los nombres de las columnas a minúsculas
+    df.columns = [col.lower() for col in df.columns]
 
+    preguntas = []
+    for _, row in df.iterrows():
+        pregunta = {
+            "item": row['item'],
+            "pregunta": row['pregunta'],
+            "escala": row['escala'],
+            # Dividir las respuestas posibles por coma
+            "posibles_respuestas": row['posibles_respuestas'].split(',')
+        }
+        preguntas.append(pregunta)
+    return preguntas
 
-def mostrar_datos_demograficos():
-    st.sidebar.header("Información General")
-    sexo = st.radio("Sexo:", ["Selecciona una opción",
-                    "Masculino", "Femenino"], key="sexo")
-    edad = st.selectbox("Rango de Edad:", [
-                        "Selecciona una opción", "18-24", "25-34", "35-44", "45-54", "55+"], key="edad")
-    salario = st.selectbox("Rango de Salario:", ["Selecciona una opción", "1-100", "101-300",
-                           "301-600", "601-1000", "1001-1500", "1501-3500", "Más de 3500"], key="salario")
-    ciudad = st.selectbox("Ciudad:", ["Selecciona una opción", "Caracas",
-                          "Valencia", "Maracay", "Maracaibo", "Barquisimeto"], key="ciudad")
-    nivel_educativo = st.radio("Nivel Educativo:", [
-                               "Selecciona una opción", "Primaria", "Secundaria", "Técnico", "Universitario"], key="nivel_educativo")
-
-    return sexo, edad, ciudad, salario, nivel_educativo
-
-# Función para mostrar las preguntas y opciones
+# Función para generar un ID aleatorio
 
 
-def mostrar_preguntas(preguntas):
-    respuestas = {}
-    preguntas_no_respondidas = []
+def generar_id():
+    return random.randint(1000, 9999)
 
-    for pregunta in preguntas:
-        with st.container():
-            st.markdown(f"<div style='background-color:#add8e6; padding:10px; border-radius:5px; margin-bottom:10px;'>"
-                        f"<strong>{pregunta['item']}. {pregunta['pregunta']}</strong></div>", unsafe_allow_html=True)
-
-            respuesta = st.radio(
-                "", options=pregunta["posibles_respuestas"], key=f"respuesta_{pregunta['item']}")
-
-            if respuesta == "Selecciona una opción":
-                preguntas_no_respondidas.append(pregunta["item"])
-
-            respuestas[pregunta["item"]] = respuesta
-
-    return respuestas, preguntas_no_respondidas
-
-# Función principal para mostrar la encuesta
+# Función para almacenar la respuesta en Firestore
 
 
-def app():
-    st.title("Encuesta de Tesis Doctoral")
-
-    # Panel izquierdo con el logo y las instrucciones
-    col1, col2 = st.columns([1, 3])
-    with col1:
-        st.image("logo_ucab.jpg", width=200)
-    with col2:
-        st.markdown("<h3>Instrucciones</h3>", unsafe_allow_html=True)
-        st.markdown(
-            """
-            <div style="background-color:#f2f2f2; padding:10px; border-radius:5px;">
-            <strong>Gracias por participar en esta encuesta.</strong><br>
-            La misma es anónima y tiene fines estrictamente académicos para una tesis doctoral.<br>
-            Lea cuidadosamente y seleccione la opción que considere pertinente. Al culminar, presione "Enviar".
-            </div>
-            """, unsafe_allow_html=True)
-
-    # Fecha y hora del llenado de la encuesta
+def guardar_respuestas(respuestas, id_encuesta):
     fecha_hora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    encuesta_id = random.randint(1000, 9999)
-    st.markdown(f"<div style='border:2px solid blue; padding:10px;'><strong>Fecha y hora: {fecha_hora}</strong><br>"
-                f"<strong>ID de Encuesta: {encuesta_id}</strong></div>", unsafe_allow_html=True)
 
-    # Mostrar datos demográficos
-    sexo, edad, ciudad, salario, nivel_educativo = mostrar_datos_demograficos()
+    # Convertir las respuestas a tipo str para evitar el error de tipo
+    respuestas_str = {key: str(value) for key, value in respuestas.items()}
 
-    # Validación de datos demográficos
-    if any(dato == "Selecciona una opción" for dato in [sexo, ciudad, salario, nivel_educativo]):
-        st.warning(
-            "Por favor complete todos los datos demográficos antes de continuar.")
-        return
+    data = {
+        "FECHA": fecha_hora,
+        "ID": id_encuesta,
+        **respuestas_str  # Usar las respuestas convertidas a str
+    }
 
-    # Cargar las preguntas desde el archivo Excel
+    try:
+        db.collection("encuestas").document(str(id_encuesta)).set(data)
+        print("Datos guardados en Firestore")
+    except Exception as e:
+        print(f"Error al guardar en Firestore: {e}")
+
+# Función para mostrar la encuesta
+
+
+def mostrar_encuesta():
     preguntas = cargar_preguntas()
+    id_encuesta = generar_id()
+
+    st.title("Encuesta de Ahorro")
+
+    # Mostrar la fecha, hora y número de control
+    st.sidebar.write(f"Fecha y hora: {
+                     datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    st.sidebar.write(f"ID de encuesta: {id_encuesta}")
+
+    # Panel izquierdo con instrucciones
+    with st.sidebar:
+        # Ajusta la ruta de la imagen si es necesario
+        st.image("ucab_logo.jpg", width=200)
+        st.markdown("### Instrucciones")
+        st.markdown("""
+        **Gracias por participar en esta encuesta. La misma es anónima y tiene fines estrictamente académicos para una tesis doctoral.**
+        Lea cuidadosamente y seleccione la opción que considere pertinente, al culminar presione Enviar.
+        """)
+
+    # Respuestas iniciales
+    respuestas = {
+        "sexo": None,
+        "rango_eda": None,
+        "rango_ingreso": None,
+        "nivel_educativo": None,
+        "ciudad": "Caracas"  # Valor por defecto para ciudad
+    }
+
+    # Información General
+    st.subheader("Información General")
+
+    sexo = st.radio("Sexo", ['M', 'F'], key="sexo")
+    respuestas["sexo"] = sexo
+
+    rango_eda = st.selectbox(
+        "Rango de Edad", ['18-24', '25-34', '35-44', '45-54', '55+'], key="rango_eda")
+    respuestas["rango_eda"] = rango_eda
+
+    rango_ingreso = st.selectbox("Rango de Ingreso Familiar", [
+                                 '1-100', '101-300', '301-600', '601-1000', '1001-1500', '1501-3500', 'más de 3500'], key="rango_ingreso")
+    respuestas["rango_ingreso"] = rango_ingreso
+
+    nivel_educativo = st.radio("Nivel Educativo", [
+                               'Básico', 'Licenciado', 'Maestría', 'Doctorado'], key="nivel_educativo")
+    respuestas["nivel_educativo"] = nivel_educativo
+
+    ciudad = st.selectbox("Ciudad", [
+                          'Caracas', 'Maracaibo', 'Valencia', 'Barquisimeto', 'Maracay'], key="ciudad")
+    respuestas["ciudad"] = ciudad
+
+    st.markdown("### Preguntas")
 
     # Mostrar las preguntas
-    respuestas, preguntas_no_respondidas = mostrar_preguntas(preguntas)
+    for pregunta in preguntas:
+        st.write(pregunta["pregunta"])
+        respuesta = st.radio(
+            pregunta["pregunta"], pregunta["posibles_respuestas"], key=pregunta["item"])
+        respuestas[pregunta["item"]] = respuesta
 
-    # Botón para enviar respuestas
-    if st.button("Enviar"):
+    # Validación de respuestas y envío
+    submit_button = st.button("Enviar")
+    if submit_button:
+        preguntas_no_respondidas = [
+            key for key, value in respuestas.items() if value is None]
         if preguntas_no_respondidas:
-            st.error(f"Faltan responder las preguntas: {
-                     ', '.join(map(str, preguntas_no_respondidas))}")
+            st.warning(f"Por favor, responda las siguientes preguntas: {
+                       ', '.join(map(str, preguntas_no_respondidas))}")
         else:
-            st.success("Gracias por participar en la investigación.")
-            st.balloons()
+            # Deshabilitar el botón "Enviar" después de procesar la encuesta
+            st.session_state["enviado"] = True
+            guardar_respuestas(respuestas, id_encuesta)
+            st.success("Gracias por participar en la encuesta.")
+            st.balloons()  # Efecto de globos
 
-            # Guardar las respuestas en Firestore
-            data = {
-                "ID": encuesta_id,
-                "FECHA": fecha_hora,
-                "SEXO": sexo,
-                "RANGO_EDA": edad,
-                "RANGO_INGRESO": salario,
-                "CIUDAD": ciudad,
-                "NIVEL_PROF": nivel_educativo,
-            }
-
-            # Agregar respuestas de las preguntas
-            for key, value in respuestas.items():
-                data[key] = value
-
-            try:
-                db.collection("encuestas").document(str(encuesta_id)).set(data)
-                st.write("Encuesta enviada exitosamente.")
-            except Exception as e:
-                st.error(f"Error al guardar en Firestore: {e}")
-
-            # Bloquear la encuesta
-            st.stop()
+    # Deshabilitar el botón "Enviar" si ya fue procesada la encuesta
+    if "enviado" in st.session_state and st.session_state["enviado"]:
+        st.warning(
+            "La encuesta ya ha sido enviada y no puede ser respondida nuevamente.")
+        st.button("Enviar", disabled=True)
 
 
 # Ejecutar la aplicación
 if __name__ == "__main__":
-    app()
+    mostrar_encuesta()
