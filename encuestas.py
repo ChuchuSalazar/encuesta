@@ -59,30 +59,30 @@ def mostrar_encuesta():
     preguntas_respondidas = set()
     preguntas_no_respondidas = set()
 
+    # El ciclo para mostrar las preguntas
     for index, row in df_preguntas.iterrows():
         pregunta = row['pregunta']
         posibles_respuestas = row['posibles_respuestas'].split(',')
         respuesta = None
         key = f"pregunta_{index}"
 
-        # Enmarcar las preguntas en un recuadro azul
-        with st.container():
-            st.markdown(f"""
-                <div style="background-color: lightblue; border-radius: 10px; padding: 10px;">
-                <h4>{index+1}. {pregunta}</h4>
-                """, unsafe_allow_html=True)
+        # Solo mostrar la pregunta una vez en el contenedor azul
+        st.markdown(f"""
+            <div style="background-color: lightblue; border-radius: 10px; padding: 10px;">
+            <h4>{index+1}. {pregunta}</h4>
+            """, unsafe_allow_html=True)
 
-            respuesta = st.radio(pregunta, posibles_respuestas, key=key)
+        respuesta = st.radio(pregunta, posibles_respuestas, key=key)
 
-            # Controlar las preguntas respondidas y no respondidas
-            if respuesta:
-                preguntas_respondidas.add(index)
-            else:
-                preguntas_no_respondidas.add(index)
+        # Controlar las preguntas respondidas y no respondidas
+        if respuesta:
+            preguntas_respondidas.add(index)
+        else:
+            preguntas_no_respondidas.add(index)
 
-            respuestas[index] = respuesta
+        respuestas[index] = respuesta
 
-            st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
     # Contar las preguntas respondidas
     total_preguntas = len(df_preguntas)
