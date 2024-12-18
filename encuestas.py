@@ -3,7 +3,7 @@ import pandas as pd
 import random
 import datetime
 
-# Cargar el archivo de preguntas
+# Cargar el archivo de preguntas (asumiendo que tienes un archivo 'preguntas.xlsx' con las preguntas)
 df_preguntas = pd.read_excel("preguntas.xlsx")
 
 # Función para generar ID aleatorio
@@ -29,23 +29,24 @@ def mostrar_instrucciones():
         Gracias por participar en esta encuesta. La misma es anónima y tiene fines estrictamente académicos para una tesis doctoral.
         Lea cuidadosamente y seleccione la opción que considere pertinente. Al culminar, presione "Enviar".
         </div>
-    """
-    )
+    """, unsafe_allow_html=True)
 
 # Mostrar datos demográficos
 
 
 def mostrar_datos_demograficos():
     st.sidebar.header("Datos Demográficos")
-    # Aquí se podrían agregar los datos a través de SelectBox, etc.
-    sexo = st.sidebar.radio("Sexo", ["Masculino", "Femenino"])
-    edad = st.sidebar.slider("Edad", 18, 100, 25)
-    ciudad = st.sidebar.selectbox(
-        "Ciudad", ["Caracas", "Valencia", "Maracay", "Maracaibo", "Barquisimeto"])
-    salario = st.sidebar.multiselect("Rango de salario", [
-                                     "Menos de 1.000.000", "1.000.000 - 2.000.000", "Más de 2.000.000"])
-    nivel_educativo = st.sidebar.selectbox(
-        "Nivel Educativo", ["Primaria", "Secundaria", "Técnico", "Universitario"])
+
+    # Recuadro azul para los datos demográficos
+    with st.sidebar.beta_expander("Datos Demográficos", expanded=True):
+        sexo = st.radio("Sexo", ["Masculino", "Femenino"], key="sexo")
+        edad = st.slider("Edad", 18, 100, 25)
+        ciudad = st.selectbox("Ciudad", [
+                              "Caracas", "Valencia", "Maracay", "Maracaibo", "Barquisimeto"], key="ciudad")
+        salario = st.multiselect("Rango de salario", [
+                                 "Menos de 1.000.000", "1.000.000 - 2.000.000", "Más de 2.000.000"], key="salario")
+        nivel_educativo = st.selectbox("Nivel Educativo", [
+                                       "Primaria", "Secundaria", "Técnico", "Universitario"], key="nivel_educativo")
 
     return sexo, edad, ciudad, salario, nivel_educativo
 
@@ -56,10 +57,10 @@ def mostrar_preguntas():
     respuestas = {}
     for idx, row in df_preguntas.iterrows():
         pregunta = row["pregunta"]
-        # Suponiendo que las respuestas son separadas por comas
+        # Suponiendo que las respuestas están separadas por comas
         opciones = row["posibles_respuestas"].split(",")
 
-        # Mostrar pregunta en marco azul
+        # Mostrar la pregunta en un recuadro azul
         st.markdown(f'<div class="recuadro"><b>{
                     idx + 1}. {pregunta}</b></div>', unsafe_allow_html=True)
 
@@ -71,7 +72,7 @@ def mostrar_preguntas():
 
     return respuestas
 
-# Validación antes de enviar
+# Validar respuestas
 
 
 def validar_respuestas(respuestas):
@@ -84,7 +85,7 @@ def app():
     st.title("Encuesta de Tesis Doctoral")
     mostrar_instrucciones()
 
-    # Datos demográficos
+    # Mostrar datos demográficos
     sexo, edad, ciudad, salario, nivel_educativo = mostrar_datos_demograficos()
 
     # Mostrar preguntas
@@ -102,7 +103,7 @@ def app():
                 "Por favor, responda todas las preguntas antes de enviar.")
         else:
             # Guardar respuestas y mostrar mensaje final
-            # Aquí se pueden guardar en una base de datos si es necesario
+            # Aquí se pueden guardar las respuestas en una base de datos si es necesario
             st.success(
                 "Gracias por participar. Sus respuestas han sido registradas.")
             st.balloons()  # Efecto de globos al finalizar
