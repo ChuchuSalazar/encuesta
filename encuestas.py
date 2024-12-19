@@ -169,10 +169,7 @@ def app():
         preguntas_respondidas = sum(
             [1 for r in st.session_state.respuestas.values() if r is not None])
         total_preguntas = len(preguntas) + 5
-        preguntas_no_respondidas = total_preguntas - preguntas_respondidas
-
-        st.markdown(f"### Preguntas Respondidas: {
-                    preguntas_respondidas}/{total_preguntas}")
+        porcentaje_respondido = (preguntas_respondidas / total_preguntas) * 100
 
         # Mostrar preguntas principales
         for pregunta in preguntas:
@@ -189,7 +186,12 @@ def app():
             st.markdown('</div>', unsafe_allow_html=True)
 
         # Botón de envío
-        if st.button("Enviar Encuesta", disabled=st.session_state.bloqueada):
+        enviar = st.button("Enviar Encuesta",
+                           disabled=st.session_state.bloqueada)
+        st.markdown(f"### Preguntas Respondidas: {
+                    preguntas_respondidas}/{total_preguntas} ({porcentaje_respondido:.2f}%)")
+
+        if enviar:
             for pregunta in preguntas:
                 if st.session_state.respuestas[pregunta['item']] is None:
                     st.session_state.validacion[pregunta['item']] = True
@@ -202,7 +204,6 @@ def app():
             else:
                 st.warning(
                     "Por favor, responda todas las preguntas antes de enviar.")
-                st.experimental_rerun()
 
 
 if __name__ == "__main__":
