@@ -71,24 +71,20 @@ def guardar_en_firestore(id_encuesta, data):
 def app():
     st.set_page_config(page_title="Encuesta Tesis Doctoral", layout="wide")
 
-    st.markdown(
-        """
+    st.markdown("""
         <style>
             body {
                 font-family: Arial, sans-serif;
             }
             .pregunta {
                 border: 2px solid #0078D4;
-                padding: 10px;
+                padding: 15px;
                 margin-bottom: 20px;
                 border-radius: 5px;
                 background-color: white;
             }
             .pregunta.no-respondida {
                 border-color: red;
-            }
-            .pregunta.respondida {
-                border-color: #0078D4;
             }
             .pregunta.bloqueada {
                 background-color: #f0f0f0;
@@ -113,21 +109,17 @@ def app():
                 color: white;
             }
         </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    """, unsafe_allow_html=True)
 
     col1, col2 = st.columns([1, 2])
 
     with col1:
         st.image("logo_ucab.jpg", width=150)
         st.subheader("Instrucciones")
-        st.markdown(
-            """
+        st.markdown("""
             **Gracias por participar en esta encuesta. La misma es anónima y tiene fines estrictamente académicos.**
             Lea cuidadosamente y seleccione la opción que considere pertinente. Al culminar, presione "Enviar".
-            """
-        )
+        """)
 
     with col2:
         st.title("Encuesta")
@@ -136,25 +128,20 @@ def app():
             st.session_state.nro_control = generar_id_encuesta()
 
         # Número de control y fecha en recuadro punteado
-        st.markdown(
-            f"""
+        st.markdown(f"""
             <div class="recuadro-control">
                 Número de Control: {st.session_state.nro_control}<br>
                 Fecha y Hora: {obtener_fecha_hora()}
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        """, unsafe_allow_html=True)
 
         preguntas = cargar_preguntas()
 
         if "respuestas" not in st.session_state:
             st.session_state.respuestas = {
-                pregunta['item']: None for pregunta in preguntas
-            }
+                pregunta['item']: None for pregunta in preguntas}
             st.session_state.validacion = {
-                pregunta['item']: False for pregunta in preguntas
-            }
+                pregunta['item']: False for pregunta in preguntas}
             st.session_state.bloqueada = False
 
         # Preguntas iniciales
@@ -163,48 +150,48 @@ def app():
                         unsafe_allow_html=True)
             col1, col2 = st.columns(2)
             with col1:
-                st.radio("Sexo", ["Masculino", "Femenino"], key="sexo")
-                st.radio("Rango de Edad", [
-                         "18-24", "25-34", "35-44", "45-54", "55+"], key="rango_edad", horizontal=True)
+                sexo = st.radio("Sexo", ["Masculino", "Femenino"], key="sexo")
+                rango_edad = st.radio("Rango de Edad", [
+                                      "18-24", "25-34", "35-44", "45-54", "55+"], key="rango_edad", horizontal=True)
             with col2:
-                st.radio("Rango de Ingreso Familiar", ["1-100", "101-300", "301-600", "601-1000",
-                         "1001-1500", "1501-3500", "Más de 3500"], key="rango_ingreso", horizontal=True)
-                st.selectbox("Ciudad", [
-                             "Caracas", "Maracay", "Valencia", "Barquisimeto", "Mérida"], key="ciudad")
-                st.selectbox("Nivel Educativo", [
-                             "Primaria", "Secundaria", "Licenciatura", "Maestría", "Doctorado"], key="nivel_educ")
+                rango_ingreso = st.radio("Rango de Ingreso Familiar", [
+                                         "1-100", "101-300", "301-600", "601-1000", "1001-1500", "1501-3500", "Más de 3500"], key="rango_ingreso", horizontal=True)
+                ciudad = st.selectbox("Ciudad", [
+                                      "Caracas", "Maracay", "Valencia", "Barquisimeto", "Mérida"], key="ciudad")
+                nivel_educ = st.selectbox("Nivel Educativo", [
+                                          "Primaria", "Secundaria", "Licenciatura", "Maestría", "Doctorado"], key="nivel_educ")
             st.markdown('</div>', unsafe_allow_html=True)
-
-        # Contador dinámico
-        preguntas_respondidas = sum(
-            [1 for r in st.session_state.respuestas.values() if r is not None]
-        )
-        total_preguntas = len(preguntas)
-        porcentaje_respondido = (preguntas_respondidas / total_preguntas) * 100
 
         # Mostrar preguntas principales
         for pregunta in preguntas:
-            estado = "respondida" if st.session_state.respuestas[pregunta['item']
-                                                                 ] else "no-respondida"
+            estado = "no-respondida" if st.session_state.respuestas[pregunta['item']
+                                                                    ] is None else "respondida"
             bloqueado = "bloqueada" if st.session_state.bloqueada else ""
-            st.markdown(
-                f'<div class="pregunta {estado} {bloqueado}">',
-                unsafe_allow_html=True,
-            )
+
+            st.markdown(f'<div class="pregunta {estado} {
+                        bloqueado}">', unsafe_allow_html=True)
+            st.markdown(f"<p>{pregunta['pregunta']
+                              }</p>", unsafe_allow_html=True)
             st.radio(
-                pregunta['pregunta'],
+                "",
                 pregunta['posibles_respuestas'],
                 key=pregunta['item']
             )
             st.markdown('</div>', unsafe_allow_html=True)
 
+        # Contador dinámico
+        preguntas_respondidas = sum(
+            [1 for r in st.session_state.respuestas.values() if r is not None])
+        total_preguntas = len(preguntas) + 5
+        porcentaje_respondido = (preguntas_respondidas / total_preguntas) * 100
+
+        # Actualizar progreso
+        st.markdown(f"### Preguntas Respondidas: {
+                    preguntas_respondidas}/{total_preguntas} ({porcentaje_respondido:.2f}%)")
+
         # Botón de envío
         enviar = st.button("Enviar Encuesta",
                            disabled=st.session_state.bloqueada)
-        st.markdown(
-            f"### Preguntas Respondidas: {
-                preguntas_respondidas}/{total_preguntas} ({porcentaje_respondido:.2f}%)"
-        )
 
         if enviar:
             for pregunta in preguntas:
