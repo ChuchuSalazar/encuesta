@@ -121,16 +121,15 @@ def app():
         preguntas_respondidas = 0
 
         # Mostrar preguntas demográficas
-        sexo = st.multiselect(
-            "Sexo", ["Masculino", "Femenino", "Otro"], key="sexo")
-        rango_edad = st.multiselect(
+        sexo = st.radio("Sexo", ["Masculino", "Femenino"], key="sexo")
+        rango_edad = st.radio(
             "Rango de Edad", ["18-24", "25-34", "35-44", "45-54", "55+"], key="rango_edad")
-        rango_ingreso = st.multiselect("Rango de Ingreso Familiar", [
+        rango_ingreso = st.radio("Rango de Ingreso Familiar", [
             "1-100", "101-300", "301-600", "601-1000", "1001-1500", "1501-3500", "Más de 3500"], key="rango_ingreso")
         nivel_educ = st.radio("Nivel Educativo", [
                               "Primaria", "Secundaria", "Licenciatura", "Maestría", "Doctorado"], key="nivel_educ")
-        ciudad = st.selectbox("Ciudad", [
-                              "Caracas", "Maracay", "Valencia", "Barquisimeto", "Mérida"], key="ciudad")
+        ciudad = st.radio("Ciudad", [
+                          "Caracas", "Maracay", "Valencia", "Barquisimeto", "Mérida"], key="ciudad")
 
         info_general = {
             "SEXO": sexo,
@@ -141,12 +140,16 @@ def app():
             "FECHA": obtener_fecha_hora()
         }
 
+        # Mostrar las preguntas principales con enmarcado azul
         for pregunta in preguntas:
             with st.expander(pregunta['pregunta']):
                 st.markdown(f'<div class="pregunta">{
                             pregunta["pregunta"]}</div>', unsafe_allow_html=True)
                 respuesta = st.radio(
-                    pregunta['pregunta'], pregunta['posibles_respuestas'], key=pregunta['item'])
+                    label=pregunta['pregunta'],
+                    options=pregunta['posibles_respuestas'],
+                    key=pregunta['item']
+                )
 
                 if respuesta:
                     preguntas_respondidas += 1
