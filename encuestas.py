@@ -14,8 +14,7 @@ FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS")
 
 if FIREBASE_CREDENTIALS is None:
     raise ValueError(
-        "La variable de entorno FIREBASE_CREDENTIALS no está configurada."
-    )
+        "La variable de entorno FIREBASE_CREDENTIALS no está configurada.")
 
 if not firebase_admin._apps:
     cred = credentials.Certificate(FIREBASE_CREDENTIALS)
@@ -74,46 +73,28 @@ def app():
 
     st.markdown("""
         <style>
-            body {
-                font-family: Arial, sans-serif;
-            }
             .pregunta {
                 border: 2px solid #0078D4;
+                padding: 10px;
+                margin-bottom: 20px;
+                border-radius: 5px;
+                background-color: white;
+            }
+            .recuadro-control {
+                border: 1px solid #0078D4;
                 padding: 15px;
                 margin-bottom: 20px;
                 border-radius: 5px;
                 background-color: white;
-                color: black;
-            }
-            .pregunta.no-respondida {
-                border-color: red;
-            }
-            .pregunta.respondida {
-                border-color: #0078D4;
-            }
-            .pregunta.bloqueada {
-                background-color: #f0f0f0;
-                pointer-events: none;
-                color: #888;
-            }
-            .recuadro-control {
-                border: 1px solid #0078D4;
-                padding: 10px;
-                margin-bottom: 10px;
-                border-radius: 5px;
-                font-size: 0.85em;
+                font-size: 1em;
             }
             .boton-enviar {
                 background-color: #0078D4;
                 color: white;
-                font-size: 1.1em;
-                padding: 10px 20px;
-                border: none;
-                border-radius: 5px;
-                cursor: pointer;
+                font-weight: bold;
             }
         </style>
-    """, unsafe_allow_html=True)
+    ", unsafe_allow_html=True)
 
     col1, col2 = st.columns([1, 2])
 
@@ -121,8 +102,10 @@ def app():
         st.image("logo_ucab.jpg", width=150)
         st.subheader("Instrucciones")
         st.markdown("""
-            **Gracias por participar en esta encuesta. La misma es anónima y tiene fines estrictamente académicos.**
-            Lea cuidadosamente y seleccione la opción que considere pertinente. Al culminar, presione "Enviar".
+            ** Gracias por participar en esta encuesta.**
+            - Lea cuidadosamente las preguntas.
+            - Seleccione la opción que considere pertinente.
+            - Al finalizar, presione el botón "Enviar".
         """)
 
     with col2:
@@ -130,69 +113,54 @@ def app():
 
         if "nro_control" not in st.session_state:
             st.session_state.nro_control = generar_id_encuesta()
+            st.session_state.fecha_hora = obtener_fecha_hora()
 
-        # Número de control y fecha en recuadro punteado
+        # Mostrar número de control y fecha en un recuadro
         st.markdown(f"""
-            <div class="recuadro-control">
-                <strong>Número de Control:</strong> {st.session_state.nro_control}<br>
-                <strong>Fecha y Hora:</strong> {obtener_fecha_hora()}
-            </div>
+            < div class ="recuadro-control" >
+                < b > Número de Control: < /b > {st.session_state.nro_control} < br >
+                < b > Fecha y Hora: < /b > {st.session_state.fecha_hora}
+            < /div >
         """, unsafe_allow_html=True)
 
         preguntas = cargar_preguntas()
 
         if "respuestas" not in st.session_state:
             st.session_state.respuestas = {
-                pregunta['item']: None for pregunta in preguntas
-            }
-            st.session_state.validacion = {
-                pregunta['item']: False for pregunta in preguntas
-            }
-            st.session_state.bloqueada = False
+                pregunta['item']: None for pregunta in preguntas}
 
-        # Contador dinámico
+        # Contador dinámico de preguntas respondidas
         preguntas_respondidas = sum(
-            [1 for r in st.session_state.respuestas.values() if r is not None]
-        )
+            [1 for r in st.session_state.respuestas.values() if r is not None])
         total_preguntas = len(preguntas)
         porcentaje_respondido = (preguntas_respondidas / total_preguntas) * 100
 
-        # Mostrar preguntas principales
+        # Mostrar preguntas dentro de recuadros azules
         for pregunta in preguntas:
-            estado = "respondida" if st.session_state.respuestas[pregunta['item']
-                                                                 ] else "no-respondida"
-            bloqueado = "bloqueada" if st.session_state.bloqueada else ""
-            st.markdown(f"<div class=\"pregunta {estado} {
-                        bloqueado}\">", unsafe_allow_html=True)
+            st.markdown(f"""
+                < div class ="pregunta" >
+                    < p > <b > {pregunta['pregunta']} < /b > </p >
+                < / div >
+            """, unsafe_allow_html=True)
             st.radio(
-                f"{pregunta['pregunta']}",
+                "",
                 pregunta['posibles_respuestas'],
                 key=pregunta['item']
             )
-            st.markdown("</div>", unsafe_allow_html=True)
 
-        # Actualizar el porcentaje de avance
-        st.markdown(f"### Preguntas Respondidas: {
-                    preguntas_respondidas}/{total_preguntas} ({porcentaje_respondido:.2f}%)")
+        # Mostrar el porcentaje de avance
+        st.markdown(f"<b>Progreso:</b> {porcentaje_respondido:.2f}%", unsafe_allow_html=True)
 
         # Botón de envío
-        enviar = st.button("Enviar Encuesta",
-                           disabled=st.session_state.bloqueada)
+        enviar = st.button("Enviar Encuesta", key="enviar")
 
         if enviar:
-            for pregunta in preguntas:
-                if st.session_state.respuestas[pregunta['item']] is None:
-                    st.session_state.validacion[pregunta['item']] = True
-
             if preguntas_respondidas == total_preguntas:
-                st.session_state.bloqueada = True
-                st.success(
-                    "¡Gracias por participar! La encuesta ha sido enviada.")
+                guardar_en_firestore(st.session_state.nro_control, st.session_state.respuestas)
+                st.success("¡Gracias por participar! La encuesta ha sido enviada.")
                 st.balloons()
             else:
-                st.warning(
-                    "Por favor, responda todas las preguntas antes de enviar.")
-
+                st.warning("Por favor, responda todas las preguntas antes de enviar.")
 
 if __name__ == "__main__":
     app()
