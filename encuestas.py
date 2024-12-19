@@ -14,7 +14,8 @@ FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS")
 
 if FIREBASE_CREDENTIALS is None:
     raise ValueError(
-        "La variable de entorno FIREBASE_CREDENTIALS no está configurada.")
+        "La variable de entorno FIREBASE_CREDENTIALS no está configurada."
+    )
 
 if not firebase_admin._apps:
     cred = credentials.Certificate(FIREBASE_CREDENTIALS)
@@ -82,23 +83,21 @@ def app():
                 margin-bottom: 20px;
                 border-radius: 5px;
                 background-color: white;
+                color: black;
             }
             .pregunta.no-respondida {
                 border-color: red;
+            }
+            .pregunta.respondida {
+                border-color: #0078D4;
             }
             .pregunta.bloqueada {
                 background-color: #f0f0f0;
                 pointer-events: none;
                 color: #888;
             }
-            .recuadro-inicial {
-                border: 1px solid #0078D4;
-                padding: 15px;
-                margin-bottom: 20px;
-                border-radius: 5px;
-            }
             .recuadro-control {
-                border: 1px dashed #0078D4;
+                border: 1px solid #0078D4;
                 padding: 10px;
                 margin-bottom: 10px;
                 border-radius: 5px;
@@ -107,6 +106,11 @@ def app():
             .boton-enviar {
                 background-color: #0078D4;
                 color: white;
+                font-size: 1.1em;
+                padding: 10px 20px;
+                border: none;
+                border-radius: 5px;
+                cursor: pointer;
             }
         </style>
     """, unsafe_allow_html=True)
@@ -130,8 +134,8 @@ def app():
         # Número de control y fecha en recuadro punteado
         st.markdown(f"""
             <div class="recuadro-control">
-                Número de Control: {st.session_state.nro_control}<br>
-                Fecha y Hora: {obtener_fecha_hora()}
+                <strong>Número de Control:</strong> {st.session_state.nro_control}<br>
+                <strong>Fecha y Hora:</strong> {obtener_fecha_hora()}
             </div>
         """, unsafe_allow_html=True)
 
@@ -139,53 +143,35 @@ def app():
 
         if "respuestas" not in st.session_state:
             st.session_state.respuestas = {
-                pregunta['item']: None for pregunta in preguntas}
+                pregunta['item']: None for pregunta in preguntas
+            }
             st.session_state.validacion = {
-                pregunta['item']: False for pregunta in preguntas}
+                pregunta['item']: False for pregunta in preguntas
+            }
             st.session_state.bloqueada = False
-
-        # Preguntas iniciales
-        with st.container():
-            st.markdown('<div class="recuadro-inicial">',
-                        unsafe_allow_html=True)
-            col1, col2 = st.columns(2)
-            with col1:
-                sexo = st.radio("Sexo", ["Masculino", "Femenino"], key="sexo")
-                rango_edad = st.radio("Rango de Edad", [
-                                      "18-24", "25-34", "35-44", "45-54", "55+"], key="rango_edad", horizontal=True)
-            with col2:
-                rango_ingreso = st.radio("Rango de Ingreso Familiar", [
-                                         "1-100", "101-300", "301-600", "601-1000", "1001-1500", "1501-3500", "Más de 3500"], key="rango_ingreso", horizontal=True)
-                ciudad = st.selectbox("Ciudad", [
-                                      "Caracas", "Maracay", "Valencia", "Barquisimeto", "Mérida"], key="ciudad")
-                nivel_educ = st.selectbox("Nivel Educativo", [
-                                          "Primaria", "Secundaria", "Licenciatura", "Maestría", "Doctorado"], key="nivel_educ")
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        # Mostrar preguntas principales
-        for pregunta in preguntas:
-            estado = "no-respondida" if st.session_state.respuestas[pregunta['item']
-                                                                    ] is None else "respondida"
-            bloqueado = "bloqueada" if st.session_state.bloqueada else ""
-
-            st.markdown(f'<div class="pregunta {estado} {
-                        bloqueado}">', unsafe_allow_html=True)
-            st.markdown(f"<p>{pregunta['pregunta']
-                              }</p>", unsafe_allow_html=True)
-            st.radio(
-                "",
-                pregunta['posibles_respuestas'],
-                key=pregunta['item']
-            )
-            st.markdown('</div>', unsafe_allow_html=True)
 
         # Contador dinámico
         preguntas_respondidas = sum(
-            [1 for r in st.session_state.respuestas.values() if r is not None])
-        total_preguntas = len(preguntas) + 5
+            [1 for r in st.session_state.respuestas.values() if r is not None]
+        )
+        total_preguntas = len(preguntas)
         porcentaje_respondido = (preguntas_respondidas / total_preguntas) * 100
 
-        # Actualizar progreso
+        # Mostrar preguntas principales
+        for pregunta in preguntas:
+            estado = "respondida" if st.session_state.respuestas[pregunta['item']
+                                                                 ] else "no-respondida"
+            bloqueado = "bloqueada" if st.session_state.bloqueada else ""
+            st.markdown(f"<div class=\"pregunta {estado} {
+                        bloqueado}\">", unsafe_allow_html=True)
+            st.radio(
+                f"{pregunta['pregunta']}",
+                pregunta['posibles_respuestas'],
+                key=pregunta['item']
+            )
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        # Actualizar el porcentaje de avance
         st.markdown(f"### Preguntas Respondidas: {
                     preguntas_respondidas}/{total_preguntas} ({porcentaje_respondido:.2f}%)")
 
