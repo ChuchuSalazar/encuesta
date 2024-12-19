@@ -12,19 +12,16 @@ from dotenv import load_dotenv
 load_dotenv()
 FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS")
 
-# Verificar si se ha establecido correctamente la variable de entorno
 if FIREBASE_CREDENTIALS is None:
     raise ValueError(
         "La variable de entorno FIREBASE_CREDENTIALS no está configurada.")
 
-# Inicializar Firebase si no está inicializado
 if not firebase_admin._apps:
     cred = credentials.Certificate(FIREBASE_CREDENTIALS)
     app = initialize_app(cred)
 else:
     app = get_app()
 
-# Obtener la referencia a Firestore
 db = firestore.client()
 
 # Cargar preguntas desde el archivo Excel
@@ -44,7 +41,7 @@ def cargar_preguntas():
         preguntas.append(pregunta)
     return preguntas
 
-# Función para generar un ID único para cada encuesta
+# Función para generar un ID único
 
 
 def generar_id_encuesta():
@@ -56,7 +53,7 @@ def generar_id_encuesta():
 def obtener_fecha_hora():
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-# Función para guardar los datos en Firestore
+# Guardar en Firestore
 
 
 def guardar_en_firestore(id_encuesta, data):
@@ -74,17 +71,41 @@ def guardar_en_firestore(id_encuesta, data):
 def app():
     st.set_page_config(page_title="Encuesta Tesis Doctoral", layout="wide")
 
-    # Estilos personalizados
     st.markdown("""
         <style>
             body {
                 font-family: Arial, sans-serif;
             }
             .pregunta {
-                border: 1px solid #0078D4;  /* Marco azul simple */
+                border: 1px solid #0078D4;
                 padding: 10px;
                 margin-bottom: 20px;
                 border-radius: 5px;
+                background-color: white;
+            }
+            .pregunta.no-respondida {
+                border-color: red;
+            }
+            .pregunta.respondida {
+                border-color: #0078D4;
+            }
+            .pregunta.bloqueada {
+                background-color: #f0f0f0;
+                pointer-events: none;
+                color: #888;
+            }
+            .recuadro-inicial {
+                border: 1px solid #0078D4;
+                padding: 15px;
+                margin-bottom: 20px;
+                border-radius: 5px;
+            }
+            .recuadro-control {
+                border: 1px dashed #0078D4;
+                padding: 10px;
+                margin-bottom: 10px;
+                border-radius: 5px;
+                font-size: 0.85em;
             }
             .boton-enviar {
                 background-color: #0078D4;
@@ -99,7 +120,7 @@ def app():
         st.image("logo_ucab.jpg", width=150)
         st.subheader("Instrucciones")
         st.markdown("""
-            **Gracias por participar en esta encuesta. La misma es anónima y tiene fines estrictamente académicos para una tesis doctoral.**
+            **Gracias por participar en esta encuesta. La misma es anónima y tiene fines estrictamente académicos.**
             Lea cuidadosamente y seleccione la opción que considere pertinente. Al culminar, presione "Enviar".
         """)
 
@@ -109,67 +130,73 @@ def app():
         if "nro_control" not in st.session_state:
             st.session_state.nro_control = generar_id_encuesta()
 
-        st.markdown(f"### Fecha y hora: {obtener_fecha_hora()}")
-        st.markdown(f"### Número de control: {st.session_state.nro_control}")
+        # Número de control y fecha en recuadro punteado
+        st.markdown(f"""
+            <div class="recuadro-control">
+                Número de Control: {st.session_state.nro_control}<br>
+                Fecha y Hora: {obtener_fecha_hora()}
+            </div>
+        """, unsafe_allow_html=True)
 
         preguntas = cargar_preguntas()
 
-        respuestas = {}
-        preguntas_respondidas = 0
+        if "respuestas" not in st.session_state:
+            st.session_state.respuestas = {
+                pregunta['item']: None for pregunta in preguntas}
+            st.session_state.bloqueada = False
 
-        # Preguntas demográficas
-        sexo = st.radio("Sexo", ["Masculino", "Femenino"], key="sexo")
-        rango_edad = st.radio(
-            "Rango de Edad", ["18-24", "25-34", "35-44", "45-54", "55+"], key="rango_edad")
-        rango_ingreso = st.radio("Rango de Ingreso Familiar", [
-            "1-100", "101-300", "301-600", "601-1000", "1001-1500", "1501-3500", "Más de 3500"], key="rango_ingreso")
-        nivel_educ = st.radio("Nivel Educativo", [
-                              "Primaria", "Secundaria", "Licenciatura", "Maestría", "Doctorado"], key="nivel_educ")
-        ciudad = st.radio("Ciudad", [
-                          "Caracas", "Maracay", "Valencia", "Barquisimeto", "Mérida"], key="ciudad")
+        # Preguntas iniciales
+        with st.container():
+            st.markdown('<div class="recuadro-inicial">',
+                        unsafe_allow_html=True)
+            col1, col2 = st.columns(2)
+            with col1:
+                sexo = st.radio("Sexo", ["Masculino", "Femenino"], key="sexo")
+                rango_edad = st.radio("Rango de Edad", [
+                                      "18-24", "25-34", "35-44", "45-54", "55+"], key="rango_edad", horizontal=True)
+            with col2:
+                rango_ingreso = st.radio("Rango de Ingreso Familiar", [
+                                         "1-100", "101-300", "301-600", "601-1000", "1001-1500", "1501-3500", "Más de 3500"], key="rango_ingreso", horizontal=True)
+                ciudad = st.selectbox("Ciudad", [
+                                      "Caracas", "Maracay", "Valencia", "Barquisimeto", "Mérida"], key="ciudad")
+                nivel_educ = st.selectbox("Nivel Educativo", [
+                                          "Primaria", "Secundaria", "Licenciatura", "Maestría", "Doctorado"], key="nivel_educ")
+            st.markdown('</div>', unsafe_allow_html=True)
 
-        info_general = {
-            "SEXO": sexo,
-            "RANGO_EDA": rango_edad,
-            "RANGO_INGRESO": rango_ingreso,
-            "NIVEL_PROF": nivel_educ,
-            "CIUDAD": ciudad,
-            "FECHA": obtener_fecha_hora()
-        }
-
-        # Mostrar preguntas principales
-        for pregunta in preguntas:
-            st.markdown(f'<div class="pregunta">{
-                        pregunta["pregunta"]}</div>', unsafe_allow_html=True)
-            respuesta = st.radio(
-                label="Seleccione una opción:",
-                options=pregunta['posibles_respuestas'],
-                key=pregunta['item']
-            )
-
-            if respuesta:  # Contar como respondida si tiene valor
-                preguntas_respondidas += 1
-            respuestas[pregunta['item']] = respuesta
-
-        # Actualizar contador de preguntas
+        # Contador dinámico
+        preguntas_respondidas = sum(
+            [1 for r in st.session_state.respuestas.values() if r is not None])
         total_preguntas = len(preguntas) + 5
         preguntas_no_respondidas = total_preguntas - preguntas_respondidas
 
         st.markdown(f"### Preguntas Respondidas: {
-                    preguntas_respondidas}/{total_preguntas} - No Respondidas: {preguntas_no_respondidas}")
+                    preguntas_respondidas}/{total_preguntas}")
+
+        # Mostrar preguntas principales
+        for pregunta in preguntas:
+            estado = "respondida" if st.session_state.respuestas[pregunta['item']
+                                                                 ] else "no-respondida"
+            bloqueado = "bloqueada" if st.session_state.bloqueada else ""
+            st.markdown(f'<div class="pregunta {estado} {
+                        bloqueado}">', unsafe_allow_html=True)
+            st.radio(
+                pregunta['pregunta'],
+                pregunta['posibles_respuestas'],
+                key=pregunta['item'],
+                on_change=lambda: st.experimental_rerun()
+            )
+            st.markdown('</div>', unsafe_allow_html=True)
 
         # Botón de envío
-        if st.button("Enviar Encuesta") and preguntas_respondidas == total_preguntas:
-            id_encuesta = st.session_state.nro_control
-            data = {**info_general, **respuestas}
-
-            if guardar_en_firestore(id_encuesta, data):
+        if st.button("Enviar Encuesta", disabled=st.session_state.bloqueada):
+            if preguntas_respondidas == total_preguntas:
+                st.session_state.bloqueada = True
                 st.success(
                     "¡Gracias por participar! La encuesta ha sido enviada.")
                 st.balloons()
-        elif preguntas_respondidas < total_preguntas:
-            st.warning(
-                "Por favor, responda todas las preguntas antes de enviar.")
+            else:
+                st.warning(
+                    "Por favor, responda todas las preguntas antes de enviar.")
 
 
 if __name__ == "__main__":
