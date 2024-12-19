@@ -9,7 +9,7 @@ import datetime
 from dotenv import load_dotenv
 
 # Cargar las credenciales de Firebase desde la variable de entorno
-load_dotenv()  # Asegurarse de que el archivo .env sea cargado
+load_dotenv()
 FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS")
 
 # Verificar si se ha establecido correctamente la variable de entorno
@@ -17,14 +17,14 @@ if FIREBASE_CREDENTIALS is None:
     raise ValueError(
         "La variable de entorno FIREBASE_CREDENTIALS no está configurada.")
 
-# Inicializar Firebase con el archivo de credenciales si no está inicializado
+# Inicializar Firebase si no está inicializado
 if not firebase_admin._apps:
     cred = credentials.Certificate(FIREBASE_CREDENTIALS)
     app = initialize_app(cred)
 else:
-    app = get_app()  # Obtener la aplicación existente
+    app = get_app()
 
-# Obtener la referencia a la base de datos Firestore
+# Obtener la referencia a Firestore
 db = firestore.client()
 
 # Cargar preguntas desde el archivo Excel
@@ -68,26 +68,23 @@ def guardar_en_firestore(id_encuesta, data):
         st.error(f"Error al guardar en Firestore: {e}")
         return False
 
-# Función principal de la aplicación
+# Aplicación principal
 
 
 def app():
     st.set_page_config(page_title="Encuesta Tesis Doctoral", layout="wide")
 
-    # Unificar tipografía a través de la aplicación y aplicar marco azul
+    # Estilos personalizados
     st.markdown("""
         <style>
             body {
                 font-family: Arial, sans-serif;
             }
             .pregunta {
-                border: 2px solid #0078D4;  /* Marco azul */
+                border: 1px solid #0078D4;  /* Marco azul simple */
                 padding: 10px;
                 margin-bottom: 20px;
                 border-radius: 5px;
-            }
-            .pregunta:hover {
-                background-color: #f9f9f9;
             }
             .boton-enviar {
                 background-color: #0078D4;
@@ -120,7 +117,7 @@ def app():
         respuestas = {}
         preguntas_respondidas = 0
 
-        # Mostrar preguntas demográficas
+        # Preguntas demográficas
         sexo = st.radio("Sexo", ["Masculino", "Femenino"], key="sexo")
         rango_edad = st.radio(
             "Rango de Edad", ["18-24", "25-34", "35-44", "45-54", "55+"], key="rango_edad")
@@ -140,27 +137,28 @@ def app():
             "FECHA": obtener_fecha_hora()
         }
 
-        # Mostrar las preguntas principales con enmarcado azul
+        # Mostrar preguntas principales
         for pregunta in preguntas:
-            with st.expander(pregunta['pregunta']):
-                st.markdown(f'<div class="pregunta">{
-                            pregunta["pregunta"]}</div>', unsafe_allow_html=True)
-                respuesta = st.radio(
-                    label=pregunta['pregunta'],
-                    options=pregunta['posibles_respuestas'],
-                    key=pregunta['item']
-                )
+            st.markdown(f'<div class="pregunta">{
+                        pregunta["pregunta"]}</div>', unsafe_allow_html=True)
+            respuesta = st.radio(
+                label="Seleccione una opción:",
+                options=pregunta['posibles_respuestas'],
+                key=pregunta['item']
+            )
 
-                if respuesta:
-                    preguntas_respondidas += 1
-                respuestas[pregunta['item']] = respuesta
+            if respuesta:  # Contar como respondida si tiene valor
+                preguntas_respondidas += 1
+            respuestas[pregunta['item']] = respuesta
 
+        # Actualizar contador de preguntas
         total_preguntas = len(preguntas) + 5
         preguntas_no_respondidas = total_preguntas - preguntas_respondidas
 
         st.markdown(f"### Preguntas Respondidas: {
                     preguntas_respondidas}/{total_preguntas} - No Respondidas: {preguntas_no_respondidas}")
 
+        # Botón de envío
         if st.button("Enviar Encuesta") and preguntas_respondidas == total_preguntas:
             id_encuesta = st.session_state.nro_control
             data = {**info_general, **respuestas}
