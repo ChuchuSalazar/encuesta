@@ -1,155 +1,75 @@
-import os
-import firebase_admin
-from firebase_admin import credentials, firestore, initialize_app, get_app
-import pandas as pd
 import streamlit as st
-import random
-import datetime
-import json
-from dotenv import load_dotenv
+import pandas as pd
+import firebase_admin
+from firebase_admin import credentials, firestore
+import uuid
 
-# Cargar las credenciales de Firebase desde la variable de entorno
-load_dotenv()  # Asegurarse de que el archivo .env sea cargado
-FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS")
-
-# Verificar si se ha establecido correctamente la variable de entorno
-if FIREBASE_CREDENTIALS is None:
-    raise ValueError(
-        "La variable de entorno FIREBASE_CREDENTIALS no está configurada.")
-
-# Inicializar Firebase con el archivo de credenciales si no está inicializado
+# Configuración inicial de Firebase
 if not firebase_admin._apps:
-    cred = credentials.Certificate(FIREBASE_CREDENTIALS)
-    app = initialize_app(cred)
-else:
-    app = get_app()  # Obtener la aplicación existente
-
-# Obtener la referencia a la base de datos Firestore
+    # Ajustar con la ruta correcta
+    cred = credentials.Certificate("ruta/credenciales_firebase.json")
+    firebase_admin.initialize_app(cred)
 db = firestore.client()
 
-# Cargar preguntas desde el archivo Excel
+# Configuración de la página
+st.set_page_config(page_title="Encuesta - UCAB", layout="wide")
 
+# Cargar archivo Excel con las preguntas
+archivo_excel = "preguntas.xlsx"  # Ajustar con la ruta correcta
+preguntas_df = pd.read_excel(archivo_excel)
 
-def cargar_preguntas():
-    # Asegúrate de que el archivo esté en el directorio correcto
-    preguntas_df = pd.read_excel("preguntas.xlsx")
-    preguntas = []
+# Diseño de la encuesta
+col1, col2 = st.columns([1, 2], gap="large")
 
-    for _, row in preguntas_df.iterrows():
-        pregunta = {
-            "item": row['item'],
-            "pregunta": row['pregunta'],
-            "escala": row['escala'],
-            "posibles_respuestas": row['posibles_respuestas'].split(',')
-        }
-        preguntas.append(pregunta)
-    return preguntas
+with col1:
+    # Ajustar con el logo correcto
+    st.image("logo_ucab.jpg", use_column_width=True)
+    st.markdown(
+        """<div style='text-align: justify;'>Bienvenido/a a la encuesta de investigación. Por favor, responda todas las preguntas de manera honesta y complete todos los campos antes de enviar.</div>""",
+        unsafe_allow_html=True,
+    )
 
-# Función para generar un ID único para cada encuesta
+with col2:
+    # Generar un ID único para la encuesta
+    encuesta_id = str(uuid.uuid4())
+    st.markdown(f"### Número de control: {encuesta_id}")
 
+    # Crear un diccionario para almacenar las respuestas
+    respuestas = {}
 
-def generar_id_encuesta():
-    return f"ID_{random.randint(100000, 999999)}"
+    # Sección de preguntas demográficas
+    st.markdown("## Información Demográfica")
+    respuestas["sexo"] = st.radio(
+        "Sexo:", ["Femenino", "Masculino", "Otro"], index=0)
+    respuestas["edad"] = st.slider(
+        "Edad:", min_value=18, max_value=100, step=1)
+    respuestas["salario"] = st.selectbox(
+        "Rango de salario:", ["< $500", "$500 - $1000", "$1000 - $2000", "> $2000"])
+    respuestas["educacion"] = st.selectbox(
+        "Nivel educativo:", ["Secundaria",
+                             "Universitario", "Postgrado", "Doctorado"]
+    )
 
-# Función para obtener la fecha y hora actual
+    # Sección de preguntas de la encuesta
+    st.markdown("## Preguntas de la Encuesta")
+    for index, row in preguntas_df.iterrows():
+        pregunta_id = row["item"]
+        pregunta_texto = row["pregunta"]
+        escala = row["escala"].split(",")
+        respuestas[pregunta_id] = st.radio(
+            pregunta_texto, options=escala, index=0, key=pregunta_id)
 
+    # Validación de respuestas
+    if st.button("Enviar Encuesta"):
+        preguntas_no_respondidas = [
+            k for k, v in respuestas.items() if v is None or v == ""]
 
-def obtener_fecha_hora():
-    return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        if preguntas_no_respondidas:
+            st.error("Por favor, responde todas las preguntas antes de enviar.")
+        else:
+            # Guardar las respuestas en Firestore
+            db.collection("encuestas").document(encuesta_id).set(respuestas)
 
-# Función para guardar los datos en Firestore
-
-
-def guardar_en_firestore(id_encuesta, data):
-    try:
-        doc_ref = db.collection("encuestas").document(id_encuesta)
-        doc_ref.set(data)
-        return True
-    except Exception as e:
-        st.error(f"Error al guardar en Firestore: {e}")
-        return False
-
-# Función para crear la encuesta y mostrarla en Streamlit
-
-
-def app():
-    # Configuración de Streamlit
-    st.set_page_config(page_title="Encuesta Tesis Doctoral", layout="wide")
-
-    # Panel izquierdo para instrucciones y logo
-    col1, col2 = st.columns([1, 2])
-
-    with col1:
-        # Ajusta el nombre del archivo de tu logo
-        st.image("logo_ucab.jpg", width=150)
-        st.subheader("Instrucciones")
-        st.markdown("""
-            **Gracias por participar en esta encuesta. La misma es anónima y tiene fines estrictamente académicos para una tesis doctoral.**
-            Lea cuidadosamente y seleccione la opción que considere pertinente, al culminar presione Enviar.
-        """)
-
-    # Panel derecho para las preguntas
-    with col2:
-        # Título principal de la encuesta
-        st.title("Encuesta")
-
-        # Generar el número de control y mostrarlo de forma constante
-        if "nro_control" not in st.session_state:
-            st.session_state.nro_control = generar_id_encuesta()
-
-        # Mostrar la fecha y el número de control, manteniendo constante el nro_control
-        st.markdown(f"### Fecha y hora: {obtener_fecha_hora()}")
-        st.markdown(f"### Número de control: {st.session_state.nro_control}")
-
-        # Cargar las preguntas
-        preguntas = cargar_preguntas()
-
-        # Mostrar las preguntas "Información General"
-        sexo = st.radio("Sexo", ["M", "F"], key="sexo")
-        rango_edad = st.selectbox(
-            "Rango de Edad", ["18-24", "25-34", "35-44", "45-54", "55+"], key="rango_edad")
-        rango_ingreso = st.selectbox("Rango de Ingreso Familiar", [
-                                     "1-100", "101-300", "301-600", "601-1000", "1001-1500", "1501-3500", "Más de 3500"], key="rango_ingreso")
-        nivel_educ = st.radio("Nivel Educativo", [
-                              "Primaria", "Secundaria", "Licenciatura", "Maestría", "Doctorado"], key="nivel_educ")
-        ciudad = st.selectbox("Ciudad", [
-                              "Caracas", "Maracay", "Valencia", "Barquisimeto", "Mérida"], key="ciudad")
-
-        # Crear un diccionario con la información general
-        info_general = {
-            "SEXO": sexo,
-            "RANGO_EDA": rango_edad,
-            "RANGO_INGRESO": rango_ingreso,
-            "NIVEL_PROF": nivel_educ,
-            "CIUDAD": ciudad,
-            "FECHA": obtener_fecha_hora()
-        }
-
-        # Mostrar las preguntas principales
-        respuestas = {}
-        for pregunta in preguntas:
-            st.subheader(pregunta['pregunta'])
-            respuesta = st.radio(
-                pregunta['pregunta'], pregunta['posibles_respuestas'], key=pregunta['item'])
-            respuestas[pregunta['item']] = respuesta
-
-        # Botón para enviar los datos
-        if st.button("Enviar Encuesta"):
-            # Obtener el ID único para la encuesta
-            # Usar el número de control constante
-            id_encuesta = st.session_state.nro_control
-
-            # Crear un objeto de datos que incluirá la información general y las respuestas
-            data = {**info_general, **respuestas}
-
-            # Guardar los datos en Firestore
-            if guardar_en_firestore(id_encuesta, data):
-                st.success(
-                    "¡Gracias por participar! La encuesta ha sido enviada.")
-                st.balloons()  # Mostrar globos de despedida
-                # Inhabilitar el botón de enviar
-                st.button("Enviar Encuesta", disabled=True)
-
-
-if __name__ == "__main__":
-    app()
+            st.success(
+                "¡Encuesta enviada con éxito! Gracias por tu participación.")
+            st.balloons()
