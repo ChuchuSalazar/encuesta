@@ -1,4 +1,3 @@
-# Importar las bibliotecas necesarias
 import os
 import firebase_admin
 from firebase_admin import credentials, firestore, initialize_app, get_app
@@ -30,7 +29,6 @@ db = firestore.client()
 def cargar_preguntas():
     preguntas_df = pd.read_excel("preguntas.xlsx")
     preguntas = []
-
     for _, row in preguntas_df.iterrows():
         pregunta = {
             "item": row['item'],
@@ -71,6 +69,7 @@ def guardar_en_firestore(id_encuesta, data):
 def app():
     st.set_page_config(page_title="Encuesta Tesis Doctoral", layout="wide")
 
+    # Estilo para la aplicación
     st.markdown("""
         <style>
             .pregunta {
@@ -93,6 +92,12 @@ def app():
                 color: white;
                 font-weight: bold;
             }
+            .pregunta-no-contestada {
+                border: 2px solid red;
+            }
+            .pregunta-contestada {
+                border: 2px solid blue;
+            }
         </style>
     """, unsafe_allow_html=True)
 
@@ -111,6 +116,7 @@ def app():
     with col2:
         st.title("Encuesta")
 
+        # Generar y almacenar número de control y fecha
         if "nro_control" not in st.session_state:
             st.session_state.nro_control = generar_id_encuesta()
             st.session_state.fecha_hora = obtener_fecha_hora()
@@ -132,38 +138,50 @@ def app():
         # Contador dinámico de preguntas respondidas
         preguntas_respondidas = sum(
             [1 for r in st.session_state.respuestas.values() if r is not None])
-        total_preguntas = len(preguntas)
+        # Incluye las preguntas de "Información General"
+        total_preguntas = len(preguntas) + 5
         porcentaje_respondido = (preguntas_respondidas / total_preguntas) * 100
-        preguntas_no_respondidas = total_preguntas - preguntas_respondidas
 
-        # Mostrar el porcentaje de avance
-        st.markdown(f"<b>Progreso:</b> {porcentaje_respondido:.2f}% ({
-                    preguntas_no_respondidas} preguntas no respondidas de {total_preguntas})", unsafe_allow_html=True)
+        # Mostrar preguntas de Información General
+        st.markdown("""
+            <div class="recuadro-control">
+                <b>Información General</b>
+            </div>
+        """, unsafe_allow_html=True)
 
-        # Mostrar preguntas dentro de recuadros azules
+        st.radio("Sexo", ["Masculino", "Femenino"], key="sexo", index=-1)
+        st.selectbox("Rango de Edad", [
+                     "18-24", "25-34", "35-44", "45-54", "55+"], key="edad", index=-1)
+        st.selectbox("Rango de Ingreso Familiar", [
+                     "1-100", "101-300", "301-600", "601-1000", "1001-1500", "1501-3500", "más de 3500"], key="ingreso", index=-1)
+        st.selectbox("Nivel Educativo", [
+                     "Primaria", "Secundaria", "Licenciado", "Postgrado"], key="educacion", index=-1)
+        st.selectbox("Ciudad", ["Caracas", "Maracaibo", "Valencia",
+                     "Barquisimeto", "Maracay"], key="ciudad", index=-1)
+
+        # Mostrar preguntas adicionales
         for pregunta in preguntas:
             st.markdown(f"""
                 <div class="pregunta">
-                    <p><b>{pregunta['pregunta']}</b></p>
+                    <b>{pregunta['pregunta']}</b>
                 </div>
             """, unsafe_allow_html=True)
-            st.radio(
-                "",
-                ["Selecciona una opción"] + pregunta['posibles_respuestas'],
-                index=0,
-                key=pregunta['item']
-            )
+            respuesta = st.radio(
+                "", pregunta['posibles_respuestas'], key=pregunta['item'], index=-1)
+
+            # Guardar las respuestas
+            if respuesta:
+                st.session_state.respuestas[pregunta['item']] = respuesta
+
+        # Mostrar el porcentaje de progreso
+        st.markdown(
+            f"<b>Progreso:</b> {porcentaje_respondido:.2f}%", unsafe_allow_html=True)
 
         # Botón de envío
         enviar = st.button("Enviar Encuesta", key="enviar")
 
         if enviar:
-            preguntas_respondidas = sum(
-                [1 for r in st.session_state.respuestas.values() if r is not None and r != "Selecciona una opción"])
-            preguntas_no_respondidas = total_preguntas - preguntas_respondidas
-            porcentaje_respondido = (
-                preguntas_respondidas / total_preguntas) * 100
-
+            # Validar que todas las preguntas sean respondidas
             if preguntas_respondidas == total_preguntas:
                 guardar_en_firestore(
                     st.session_state.nro_control, st.session_state.respuestas)
@@ -171,8 +189,12 @@ def app():
                     "¡Gracias por participar! La encuesta ha sido enviada.")
                 st.balloons()
             else:
-                st.warning(f"Por favor, responda todas las preguntas antes de enviar. Quedan {
-                           preguntas_no_respondidas} preguntas sin responder.")
+                st.warning(
+                    "Por favor, responda todas las preguntas antes de enviar.")
+                for pregunta_item, respuesta in st.session_state.respuestas.items():
+                    if respuesta is None:
+                        st.markdown(
+                            f"**Pregunta {pregunta_item} no respondida**", unsafe_allow_html=True)
 
 
 if __name__ == "__main__":
