@@ -108,6 +108,10 @@ def app():
                 background-color: #FF6B6B;
                 border: 2px solid red;
             }
+            .bloqueado {
+                background-color: #F0F0F0;
+                pointer-events: none;
+            }
         </style>
         """,
         unsafe_allow_html=True
@@ -151,12 +155,6 @@ def app():
             st.session_state.respuestas = {
                 pregunta['item']: "Seleccione una opción" for pregunta in preguntas}
 
-        # Contador dinámico de preguntas respondidas
-        preguntas_respondidas = sum(
-            [1 for r in st.session_state.respuestas.values() if r != "Seleccione una opción"])
-        total_preguntas = len(preguntas)
-        porcentaje_respondido = (preguntas_respondidas / total_preguntas) * 100
-
         # Mostrar preguntas dentro de recuadros azules
         no_respondidas = []
         for pregunta in preguntas:
@@ -167,32 +165,23 @@ def app():
             )
             st.session_state.respuestas[pregunta['item']] = respuesta
 
+            # Marcar en rojo las preguntas no respondidas
             if respuesta == "Seleccione una opción":
                 no_respondidas.append(pregunta['item'])
 
-            # Marcar en rojo las preguntas no respondidas
-            if respuesta == "Seleccione una opción":
-                st.markdown(
-                    f"""
-                    <div class="pregunta rojo">
-                        <p><b>{pregunta['pregunta']}</b></p>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-            else:
-                st.markdown(
-                    f"""
-                    <div class="pregunta">
-                        <p><b>{pregunta['pregunta']}</b></p>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+        # Calcular el porcentaje de respuestas
+        preguntas_respondidas = len(preguntas) - len(no_respondidas)
+        total_preguntas = len(preguntas)
+        porcentaje_respondido = (preguntas_respondidas / total_preguntas) * 100
 
         # Mostrar el porcentaje de avance
         st.markdown(
             f"<b>Progreso:</b> {porcentaje_respondido:.2f}%", unsafe_allow_html=True)
+
+        # Mostrar el número de preguntas no respondidas
+        if len(no_respondidas) > 0:
+            st.warning(
+                f"Por favor, responda las siguientes preguntas: {', '.join(no_respondidas)}")
 
         # Botón de envío
         enviar = st.button("Enviar Encuesta", key="enviar")
@@ -203,6 +192,17 @@ def app():
                     st.success(
                         "¡Gracias por participar! La encuesta ha sido enviada.")
                     st.balloons()
+
+                    # Bloquear la encuesta después de enviarla
+                    st.markdown(
+                        """
+                        <style>
+                            .stApp {
+                                background-color: #F0F0F0;
+                                pointer-events: none;
+                            }
+                        </style>
+                        """, unsafe_allow_html=True)
             else:
                 st.warning(
                     f"Por favor, responda las siguientes preguntas: {', '.join(no_respondidas)}")
