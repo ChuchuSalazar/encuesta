@@ -77,7 +77,7 @@ def app():
                 font-family: Arial, sans-serif;
             }
             .pregunta {
-                border: 1px solid #0078D4;
+                border: 2px solid #0078D4;
                 padding: 10px;
                 margin-bottom: 20px;
                 border-radius: 5px;
@@ -143,6 +143,8 @@ def app():
         if "respuestas" not in st.session_state:
             st.session_state.respuestas = {
                 pregunta['item']: None for pregunta in preguntas}
+            st.session_state.validacion = {
+                pregunta['item']: False for pregunta in preguntas}
             st.session_state.bloqueada = False
 
         # Preguntas iniciales
@@ -182,13 +184,16 @@ def app():
             st.radio(
                 pregunta['pregunta'],
                 pregunta['posibles_respuestas'],
-                key=pregunta['item'],
-                on_change=lambda: st.experimental_rerun()
+                key=pregunta['item']
             )
             st.markdown('</div>', unsafe_allow_html=True)
 
         # Botón de envío
         if st.button("Enviar Encuesta", disabled=st.session_state.bloqueada):
+            for pregunta in preguntas:
+                if st.session_state.respuestas[pregunta['item']] is None:
+                    st.session_state.validacion[pregunta['item']] = True
+
             if preguntas_respondidas == total_preguntas:
                 st.session_state.bloqueada = True
                 st.success(
@@ -197,6 +202,7 @@ def app():
             else:
                 st.warning(
                     "Por favor, responda todas las preguntas antes de enviar.")
+                st.experimental_rerun()
 
 
 if __name__ == "__main__":
