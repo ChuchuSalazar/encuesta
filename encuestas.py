@@ -69,10 +69,11 @@ def guardar_en_firestore(id_encuesta, data):
 
 
 def validar_respuestas(respuestas):
+    no_respondidas = []
     for key, value in respuestas.items():
         if value is None or value == "Seleccione una opción":
-            return False
-    return True
+            no_respondidas.append(key)
+    return no_respondidas
 
 # Aplicación principal
 
@@ -102,6 +103,10 @@ def app():
                 background-color: #0078D4;
                 color: white;
                 font-weight: bold;
+            }
+            .rojo {
+                background-color: #FF6B6B;
+                border: 2px solid red;
             }
         </style>
         """,
@@ -153,22 +158,37 @@ def app():
         porcentaje_respondido = (preguntas_respondidas / total_preguntas) * 100
 
         # Mostrar preguntas dentro de recuadros azules
+        no_respondidas = []
         for pregunta in preguntas:
-            st.markdown(
-                f"""
-                <div class="pregunta">
-                    <p><b>{pregunta['pregunta']}</b></p>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-
             respuesta = st.radio(
-                "",
+                pregunta['pregunta'],
                 pregunta['posibles_respuestas'],
                 key=pregunta['item']
             )
             st.session_state.respuestas[pregunta['item']] = respuesta
+
+            if respuesta == "Seleccione una opción":
+                no_respondidas.append(pregunta['item'])
+
+            # Marcar en rojo las preguntas no respondidas
+            if respuesta == "Seleccione una opción":
+                st.markdown(
+                    f"""
+                    <div class="pregunta rojo">
+                        <p><b>{pregunta['pregunta']}</b></p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+            else:
+                st.markdown(
+                    f"""
+                    <div class="pregunta">
+                        <p><b>{pregunta['pregunta']}</b></p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
 
         # Mostrar el porcentaje de avance
         st.markdown(
@@ -178,15 +198,14 @@ def app():
         enviar = st.button("Enviar Encuesta", key="enviar")
 
         if enviar:
-            if validar_respuestas(st.session_state.respuestas):
-                guardar_en_firestore(
-                    st.session_state.nro_control, st.session_state.respuestas)
-                st.success(
-                    "¡Gracias por participar! La encuesta ha sido enviada.")
-                st.balloons()
+            if len(no_respondidas) == 0:
+                if guardar_en_firestore(st.session_state.nro_control, st.session_state.respuestas):
+                    st.success(
+                        "¡Gracias por participar! La encuesta ha sido enviada.")
+                    st.balloons()
             else:
                 st.warning(
-                    "Por favor, responda todas las preguntas antes de enviar.")
+                    f"Por favor, responda las siguientes preguntas: {', '.join(no_respondidas)}")
 
 
 if __name__ == "__main__":
