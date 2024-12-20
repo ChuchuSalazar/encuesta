@@ -167,6 +167,7 @@ def app():
             st.session_state.respuestas["nivel_prof"] = None
 
         # Mostrar preguntas dentro de recuadros azules y calcular el progreso
+        preguntas_no_respondidas = []
         for i, pregunta in enumerate(preguntas, start=1):
             # Numera las preguntas del 01 al 25
             pregunta_numero = f"Pregunta {i:02d}"
@@ -183,7 +184,7 @@ def app():
             # Si la escala es 5 (por ejemplo, Likert 5 puntos)
             if pregunta['escala'] == "5":
                 options = pregunta['posibles_respuestas']
-                st.radio(
+                respuesta = st.radio(
                     "",
                     options,
                     key=pregunta['item']
@@ -191,11 +192,18 @@ def app():
             else:
                 # Si la escala no es 5, se ajusta según el número de opciones
                 options = pregunta['posibles_respuestas']
-                st.radio(
+                respuesta = st.radio(
                     "",
                     options,
                     key=pregunta['item']
                 )
+
+            # Registrar la respuesta
+            st.session_state.respuestas[pregunta['item']] = respuesta
+
+            # Verificar si la pregunta está respondida
+            if respuesta is None:
+                preguntas_no_respondidas.append(pregunta_numero)
 
         # Calcular el porcentaje de progreso basado en las respuestas
         preguntas_respondidas = sum(
@@ -208,6 +216,11 @@ def app():
         st.markdown(
             f"<b>Progreso:</b> {porcentaje_respondido:.2f}%", unsafe_allow_html=True)
 
+        # Mostrar preguntas no respondidas
+        if preguntas_no_respondidas:
+            st.warning(f"Por favor, responda las siguientes preguntas: {
+                       ', '.join(preguntas_no_respondidas)}")
+
         # Botón de envío
         enviar = st.button("Enviar Encuesta", key="enviar")
 
@@ -218,18 +231,17 @@ def app():
                     "ID": str(st.session_state.nro_control),
                     "FECHA": st.session_state.fecha_hora,
                     "SEXO": sexo,
-                    "RANGO_EDAD": rango_edad,
+                    "RANGO_EDA": rango_edad,
                     "RANGO_INGRESO": rango_ingreso,
                     "CIUDAD": ciudad,
                     "NIVEL_PROF": nivel_prof,
                     # Convertir respuestas a cadenas
                     **{key: str(value) for key, value in st.session_state.respuestas.items()},
                 }
-                guardar_en_firestore(
-                    st.session_state.nro_control, datos_encuesta)
-                st.success(
-                    "¡Gracias por participar! La encuesta ha sido enviada.")
-                st.balloons()
+                if guardar_en_firestore(st.session_state.nro_control, datos_encuesta):
+                    st.success(
+                        "¡Gracias por participar! La encuesta ha sido enviada.")
+                    st.balloons()
             else:
                 st.warning(
                     "Por favor, responda todas las preguntas antes de enviar.")
