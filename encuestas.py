@@ -14,8 +14,7 @@ FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS")
 
 if FIREBASE_CREDENTIALS is None:
     raise ValueError(
-        "La variable de entorno FIREBASE_CREDENTIALS no está configurada."
-    )
+        "La variable de entorno FIREBASE_CREDENTIALS no está configurada.")
 
 if not firebase_admin._apps:
     cred = credentials.Certificate(FIREBASE_CREDENTIALS)
@@ -34,10 +33,10 @@ def cargar_preguntas():
 
     for _, row in preguntas_df.iterrows():
         pregunta = {
-            "item": row["item"],
-            "pregunta": row["pregunta"],
-            "escala": row["escala"],
-            "posibles_respuestas": row["posibles_respuestas"].split(","),
+            "item": row['item'],
+            "pregunta": row['pregunta'],
+            "escala": row['escala'],
+            "posibles_respuestas": row['posibles_respuestas'].split(',')
         }
         preguntas.append(pregunta)
     return preguntas
@@ -54,7 +53,7 @@ def generar_id_encuesta():
 def obtener_fecha_hora():
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-# Guardar en Firestore
+# Guardar en Firestore con estructura validada
 
 
 def guardar_en_firestore(id_encuesta, data):
@@ -134,12 +133,30 @@ def app():
 
         preguntas = cargar_preguntas()
 
+        # Sección de datos demográficos
+        st.header("Datos Demográficos")
+        sexo = st.selectbox("Sexo", ["Masculino", "Femenino"], key="sexo")
+        rango_edad = st.selectbox(
+            "Rango de Edad",
+            ["18-25", "26-35", "36-45", "46-55", "56 o más"],
+            key="rango_edad",
+        )
+        rango_ingreso = st.selectbox(
+            "Rango de Ingreso", ["<1000", "1000-3000", "3000-5000", ">5000"], key="rango_ingreso"
+        )
+        ciudad = st.text_input("Ciudad", key="ciudad")
+        nivel_prof = st.selectbox(
+            "Nivel Educativo", ["Bachillerato", "Universitario", "Postgrado"], key="nivel_prof"
+        )
+
+        # Inicializar respuestas de las preguntas
         if "respuestas" not in st.session_state:
             st.session_state.respuestas = {
                 pregunta["item"]: None for pregunta in preguntas
             }
 
-        # Mostrar preguntas dentro de recuadros azules
+        # Mostrar preguntas
+        st.header("Preguntas")
         for pregunta in preguntas:
             st.markdown(
                 f"""
@@ -151,7 +168,7 @@ def app():
             )
             respuesta = st.radio(
                 "",
-                options=pregunta["posibles_respuestas"],
+                options=[int(op) for op in pregunta["posibles_respuestas"]],
                 key=pregunta["item"],
             )
             st.session_state.respuestas[pregunta["item"]] = respuesta
@@ -173,11 +190,19 @@ def app():
         enviar = st.button("Enviar Encuesta", key="enviar")
 
         if enviar:
-            if preguntas_respondidas == total_preguntas:
+            if preguntas_respondidas == total_preguntas and ciudad.strip():
                 datos_encuesta = {
-                    "nro_control": st.session_state.nro_control,
-                    "fecha_hora": st.session_state.fecha_hora,
-                    "respuestas": st.session_state.respuestas,
+                    "ID": st.session_state.nro_control,
+                    "FECHA": st.session_state.fecha_hora,
+                    "SEXO": sexo,
+                    "RANGO_EDAD": rango_edad,
+                    "RANGO_INGRESO": rango_ingreso,
+                    "CIUDAD": ciudad,
+                    "NIVEL_PROF": nivel_prof,
+                    **{
+                        k: (v if v is not None else "Sin respuesta")
+                        for k, v in st.session_state.respuestas.items()
+                    },
                 }
                 if guardar_en_firestore(
                     st.session_state.nro_control, datos_encuesta
@@ -189,7 +214,7 @@ def app():
                     st.session_state.respuestas = None
             else:
                 st.warning(
-                    "Por favor, responda todas las preguntas antes de enviar."
+                    "Por favor, complete todos los campos antes de enviar."
                 )
 
 
