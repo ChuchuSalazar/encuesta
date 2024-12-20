@@ -214,12 +214,12 @@ def app():
             if respuesta is None:
                 preguntas_no_respondidas.append(pregunta_numero)
 
-        # Calcular el porcentaje de progreso basado en las respuestas
-        preguntas_respondidas = sum(
-            [1 for r in st.session_state.respuestas.values() if r is not None])
+        # Calcular el porcentaje de progreso basado en las respuestas dadas
+        respuestas_llenadas = sum(
+            1 for r in st.session_state.respuestas.values() if r is not None)
         # Incluyendo las 5 preguntas generales
-        total_preguntas = len(preguntas) + 5
-        porcentaje_respondido = (preguntas_respondidas / total_preguntas) * 100
+        total_respuestas = len(preguntas) + 5
+        porcentaje_respondido = (respuestas_llenadas / total_respuestas) * 100
 
         # Mostrar el porcentaje de avance
         st.markdown(
@@ -241,7 +241,7 @@ def app():
         enviar = st.button("Enviar Encuesta", key="enviar")
 
         if enviar:
-            if preguntas_respondidas == total_preguntas:
+            if respuestas_llenadas == total_respuestas:
                 # Guardar los datos en Firestore
                 datos_encuesta = {
                     "ID": str(st.session_state.nro_control),
@@ -251,12 +251,15 @@ def app():
                     "RANGO_INGRESO": rango_ingreso,
                     "CIUDAD": ciudad,
                     "NIVEL_PROF": nivel_prof,
-                    **{key: str(value) for key, value in st.session_state.respuestas.items()}
                 }
+
+                for pregunta in preguntas:
+                    datos_encuesta[pregunta['item']
+                                   ] = st.session_state.respuestas[pregunta['item']]
+
                 if guardar_en_firestore(st.session_state.nro_control, datos_encuesta):
                     st.success("¡Gracias por completar la encuesta!")
-                    # Limpiar el estado de las respuestas
-                    st.session_state.respuestas = {}
+                    st.session_state.respuestas = {}  # Limpiar respuestas después del envío
             else:
                 st.warning(
                     "Por favor, complete todas las preguntas antes de enviar.")
