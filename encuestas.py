@@ -1,20 +1,52 @@
+# Importar las bibliotecas necesarias
 import os
 import firebase_admin
-from firebase_admin import credentials, firestore, initialize_app
+from firebase_admin import credentials, firestore, initialize_app, get_app
 import pandas as pd
 import streamlit as st
 import random
 import datetime
 from dotenv import load_dotenv
 
-# Cargar variables de entorno
+# Cargar las credenciales de Firebase desde la variable de entorno
 load_dotenv()
+FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS")
 
-# Función para generar un ID único para cada encuesta
+if FIREBASE_CREDENTIALS is None:
+    raise ValueError(
+        "La variable de entorno FIREBASE_CREDENTIALS no está configurada."
+    )
+
+if not firebase_admin._apps:
+    cred = credentials.Certificate(FIREBASE_CREDENTIALS)
+    app = initialize_app(cred)
+else:
+    app = get_app()
+
+db = firestore.client()
+
+# Cargar preguntas desde el archivo Excel
+
+
+def cargar_preguntas():
+    preguntas_df = pd.read_excel("preguntas.xlsx")
+    preguntas = []
+
+    for _, row in preguntas_df.iterrows():
+        pregunta = {
+            "item": row["item"],
+            "pregunta": row["pregunta"],
+            "escala": row["escala"],
+            "posibles_respuestas": row["posibles_respuestas"].split(","),
+        }
+        preguntas.append(pregunta)
+    return preguntas
+
+# Función para generar un ID único
 
 
 def generar_id_encuesta():
-    return str(random.randint(100000, 999999))
+    return f"ID_{random.randint(100000, 999999)}"
 
 # Función para obtener la fecha y hora actual
 
@@ -22,33 +54,17 @@ def generar_id_encuesta():
 def obtener_fecha_hora():
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-# Función para cargar las preguntas desde el archivo Excel
+# Guardar en Firestore
 
 
-def cargar_preguntas():
-    # Lee el archivo Excel (asegúrate de que el archivo Excel esté en la misma carpeta que el script o proporciona la ruta)
-    df = pd.read_excel('preguntas_encuesta.xlsx')
-    preguntas = df.to_dict(orient='records')
-    return preguntas
-
-# Inicialización de Firebase
-
-
-def inicializar_firebase():
-    if not firebase_admin._apps:
-        cred = credentials.Certificate(os.getenv("FIREBASE_CREDENTIALS_PATH"))
-        initialize_app(cred)
-    db = firestore.client()
-    return db
-
-# Función para guardar los datos en Firestore
-
-
-def guardar_en_firestore(nro_control, datos_encuesta):
-    db = inicializar_firebase()
-    ref = db.collection('encuestas').document(nro_control)
-    ref.set(datos_encuesta)
-    return True  # Devuelve True para simular un guardado exitoso
+def guardar_en_firestore(id_encuesta, data):
+    try:
+        doc_ref = db.collection("encuestas").document(id_encuesta)
+        doc_ref.set(data)
+        return True
+    except Exception as e:
+        st.error(f"Error al guardar en Firestore: {e}")
+        return False
 
 # Aplicación principal
 
@@ -81,7 +97,7 @@ def app():
             }
         </style>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
     col1, col2 = st.columns([1, 2])
@@ -113,77 +129,68 @@ def app():
                 <b>Fecha y Hora:</b> {st.session_state.fecha_hora}
             </div>
             """,
-            unsafe_allow_html=True
+            unsafe_allow_html=True,
         )
 
         preguntas = cargar_preguntas()
 
         if "respuestas" not in st.session_state:
             st.session_state.respuestas = {
-                pregunta['item']: None for pregunta in preguntas}
+                pregunta["item"]: None for pregunta in preguntas
+            }
 
-        # Mostrar preguntas numeradas correlativamente
-        for i, pregunta in enumerate(preguntas, start=1):
+        # Mostrar preguntas dentro de recuadros azules
+        for pregunta in preguntas:
             st.markdown(
                 f"""
                 <div class="pregunta">
-                    <p><b>{i}. {pregunta['pregunta']}</b></p>
+                    <p><b>{pregunta['pregunta']}</b></p>
                 </div>
                 """,
-                unsafe_allow_html=True
+                unsafe_allow_html=True,
             )
             respuesta = st.radio(
                 "",
-                pregunta['posibles_respuestas'].split(','),
-                key=pregunta['item']
+                options=pregunta["posibles_respuestas"],
+                key=pregunta["item"],
             )
+            st.session_state.respuestas[pregunta["item"]] = respuesta
 
-            # Guardar las respuestas
-            if respuesta is not None:
-                st.session_state.respuestas[pregunta['item']] = respuesta
-
-        # Validación de respuestas antes de enviar
+        # Contador dinámico de preguntas respondidas
         preguntas_respondidas = sum(
-            [1 for r in st.session_state.respuestas.values() if r is not None])
+            [1 for r in st.session_state.respuestas.values() if r is not None]
+        )
         total_preguntas = len(preguntas)
         porcentaje_respondido = (preguntas_respondidas / total_preguntas) * 100
 
-        # Mostrar el porcentaje de progreso
+        # Mostrar el porcentaje de avance
         st.markdown(
-            f"<b>Progreso:</b> {porcentaje_respondido:.2f}%", unsafe_allow_html=True)
+            f"<b>Progreso:</b> {porcentaje_respondido:.2f}%",
+            unsafe_allow_html=True,
+        )
 
         # Botón de envío
         enviar = st.button("Enviar Encuesta", key="enviar")
 
         if enviar:
             if preguntas_respondidas == total_preguntas:
-                # Guardar respuestas en Firestore
                 datos_encuesta = {
                     "nro_control": st.session_state.nro_control,
                     "fecha_hora": st.session_state.fecha_hora,
-                    "respuestas": st.session_state.respuestas
+                    "respuestas": st.session_state.respuestas,
                 }
-                if guardar_en_firestore(st.session_state.nro_control, datos_encuesta):
+                if guardar_en_firestore(
+                    st.session_state.nro_control, datos_encuesta
+                ):
                     st.success(
-                        "¡Gracias por participar! La encuesta ha sido enviada.")
+                        "¡Gracias por participar! La encuesta ha sido enviada."
+                    )
                     st.balloons()
-                else:
-                    st.error("Hubo un problema al guardar los datos.")
+                    st.session_state.respuestas = None
             else:
                 st.warning(
-                    "Por favor, responda todas las preguntas antes de enviar.")
-
-        # Mostrar las preguntas no respondidas en rojo
-        for pregunta, respuesta in st.session_state.respuestas.items():
-            if respuesta is None:
-                st.markdown(
-                    f"""
-                    <style>
-                        .pregunta-{pregunta} {{
-                            border: 2px solid red;
-                        }}
-                    </style>
-                    """, unsafe_allow_html=True)
+                    "Por favor, responda todas las preguntas antes de enviar."
+                )
 
 
 if __name__ == "__main__":
