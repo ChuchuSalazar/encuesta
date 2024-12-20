@@ -160,4 +160,31 @@ def app():
                 # Guardar respuestas en Firestore
                 datos_encuesta = {
                     "nro_control": st.session_state.nro_control,
-                    "fecha_hora"
+                    "fecha_hora": st.session_state.fecha_hora,
+                    "respuestas": st.session_state.respuestas
+                }
+                if guardar_en_firestore(st.session_state.nro_control, datos_encuesta):
+                    st.success(
+                        "¡Gracias por participar! La encuesta ha sido enviada.")
+                    st.balloons()
+                else:
+                    st.error("Hubo un problema al guardar los datos.")
+            else:
+                st.warning(
+                    "Por favor, responda todas las preguntas antes de enviar.")
+
+        # Mostrar las preguntas no respondidas en rojo
+        for pregunta, respuesta in st.session_state.respuestas.items():
+            if respuesta is None:
+                st.markdown(
+                    f"""
+                    <style>
+                        .pregunta-{pregunta} {{
+                            border: 2px solid red;
+                        }}
+                    </style>
+                    """, unsafe_allow_html=True)
+
+
+if __name__ == "__main__":
+    app()
