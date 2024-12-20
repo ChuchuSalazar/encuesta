@@ -1,4 +1,4 @@
-# Importar las bibliotecas necesarias
+# Importación de bibliotecas necesarias
 import os
 import firebase_admin
 from firebase_admin import credentials, firestore, initialize_app, get_app
@@ -8,45 +8,14 @@ import random
 import datetime
 from dotenv import load_dotenv
 
-# Cargar las credenciales de Firebase desde la variable de entorno
+# Cargar las variables de entorno desde el archivo .env
 load_dotenv()
-FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS")
 
-if FIREBASE_CREDENTIALS is None:
-    raise ValueError(
-        "La variable de entorno FIREBASE_CREDENTIALS no está configurada.")
-
-if not firebase_admin._apps:
-    cred = credentials.Certificate(FIREBASE_CREDENTIALS)
-    app = initialize_app(cred)
-else:
-    app = get_app()
-
+# Inicializar Firebase
+# Usar el archivo JSON de Firebase desde el .env
+cred = credentials.Certificate(os.getenv("FIREBASE_CREDENTIALS_PATH"))
+firebase_admin.initialize_app(cred)
 db = firestore.client()
-
-# Cargar preguntas desde el archivo Excel
-
-
-def cargar_preguntas():
-    preguntas_df = pd.read_excel("preguntas.xlsx")
-    preguntas = []
-
-    for _, row in preguntas_df.iterrows():
-        pregunta = {
-            "item": row['item'],
-            "pregunta": row['pregunta'],
-            "escala": row['escala'],  # El número de opciones de la escala
-            # Opciones separadas por coma
-            "posibles_respuestas": row['posibles_respuestas'].split(',')
-        }
-        preguntas.append(pregunta)
-    return preguntas
-
-# Función para generar un ID único
-
-
-def generar_id_encuesta():
-    return f"ID_{random.randint(100000, 999999)}"
 
 # Función para obtener la fecha y hora actual
 
@@ -54,33 +23,75 @@ def generar_id_encuesta():
 def obtener_fecha_hora():
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-# Guardar en Firestore
+# Función para generar el ID de la encuesta
 
 
-def guardar_en_firestore(id_encuesta, data):
+def generar_id_encuesta():
+    return f"ID_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+# Función para guardar los datos en Firestore
+
+
+def guardar_en_firestore(id_encuesta, datos):
     try:
-        # Convertir todos los valores del diccionario a cadenas
-        data_str = {key: str(value) for key, value in data.items()}
-        doc_ref = db.collection("encuestas").document(id_encuesta)
-        doc_ref.set(data_str)
+        # Guardar la encuesta en Firestore
+        db.collection('encuestas').document(id_encuesta).set(datos)
         return True
     except Exception as e:
         st.error(f"Error al guardar en Firestore: {e}")
         return False
 
-# Función para mostrar preguntas generales (sexo, edad, etc.)
+# Función para calcular el porcentaje de progreso
+
+
+def calcular_porcentaje_respuestas(respuestas_llenadas, total_respuestas):
+    return (respuestas_llenadas / total_respuestas) * 100
+
+# Función para mostrar preguntas no respondidas al presionar "Enviar"
+
+
+def mostrar_preguntas_no_respondidas(preguntas_no_respondidas):
+    if preguntas_no_respondidas:
+        st.markdown(
+            f"""
+            <div class="recuadro-preguntas-no-respondidas">
+                <b>Las siguientes preguntas aún no han sido respondidas:</b><br>
+                {', '.join(preguntas_no_respondidas)}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    else:
+        st.success("¡Gracias por completar la encuesta!")
+
+# Función para cargar las preguntas de la encuesta
+
+
+def cargar_preguntas():
+    # Aquí deberías cargar las preguntas desde un archivo o base de datos
+    # Ejemplo con preguntas predefinidas
+    preguntas = [
+        {"item": "AV1", "pregunta": "Pregunta 01", "escala": "5", "posibles_respuestas": [
+            "Totalmente en desacuerdo", "En desacuerdo", "Neutral", "De acuerdo", "Totalmente de acuerdo"]},
+        {"item": "AV2", "pregunta": "Pregunta 02", "escala": "5", "posibles_respuestas": [
+            "Totalmente en desacuerdo", "En desacuerdo", "Neutral", "De acuerdo", "Totalmente de acuerdo"]},
+        # Agregar más preguntas aquí...
+    ]
+    return preguntas
+
+# Función para mostrar las preguntas generales (Sexo, Edad, etc.)
 
 
 def mostrar_preguntas_generales():
-    sexo = st.radio("Sexo", ["Masculino", "Femenino", "Otro"], key="sexo")
+    sexo = st.selectbox("Sexo", ["Masculino", "Femenino", "Otro"], key="sexo")
     rango_edad = st.selectbox(
-        "Rango de Edad", ["18-25", "26-35", "36-45", "46-60", "60+"], key="rango_edad")
+        "Rango de Edad", ["18-24", "25-34", "35-44", "45-54", "55+"], key="rango_edad")
     rango_ingreso = st.selectbox("Rango de Ingreso", [
-                                 "<5000", "5000-10000", "10000-20000", "20000+"], key="rango_ingreso")
+                                 "Menos de 500", "500-1000", "1000-2000", "Más de 2000"], key="rango_ingreso")
     ciudad = st.selectbox("Ciudad", [
-                          "Caracas", "Maracaibo", "Valencia", "Barquisimeto", "Otras"], key="ciudad")
-    nivel_prof = st.selectbox("Nivel Profesional", [
-                              "Bachiller", "Licenciatura", "Maestría", "Doctorado"], key="nivel_prof")
+                          "Caracas", "Maracaibo", "Valencia", "Barquisimeto", "Otro"], key="ciudad")
+    nivel_prof = st.selectbox("Nivel Educativo", [
+                              "Primaria", "Secundaria", "Universitario", "Postgrado"], key="nivel_prof")
 
     return sexo, rango_edad, rango_ingreso, ciudad, nivel_prof
 
@@ -219,23 +230,15 @@ def app():
             1 for r in st.session_state.respuestas.values() if r is not None)
         # Incluyendo las 5 preguntas generales
         total_respuestas = len(preguntas) + 5
-        porcentaje_respondido = (respuestas_llenadas / total_respuestas) * 100
+        porcentaje_respondido = calcular_porcentaje_respuestas(
+            respuestas_llenadas, total_respuestas)
 
         # Mostrar el porcentaje de avance
         st.markdown(
             f"<b>Progreso:</b> {porcentaje_respondido:.2f}%", unsafe_allow_html=True)
 
         # Mostrar preguntas no respondidas en un recuadro destacado
-        if preguntas_no_respondidas:
-            st.markdown(
-                f"""
-                <div class="recuadro-preguntas-no-respondidas">
-                    <b>Las siguientes preguntas aún no han sido respondidas:</b><br>
-                    {', '.join(preguntas_no_respondidas)}
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+        mostrar_preguntas_no_respondidas(preguntas_no_respondidas)
 
         # Botón de envío
         enviar = st.button("Enviar Encuesta", key="enviar")
@@ -244,26 +247,4 @@ def app():
             if respuestas_llenadas == total_respuestas:
                 # Guardar los datos en Firestore
                 datos_encuesta = {
-                    "ID": str(st.session_state.nro_control),
-                    "FECHA": st.session_state.fecha_hora,
-                    "SEXO": sexo,
-                    "RANGO_EDA": rango_edad,
-                    "RANGO_INGRESO": rango_ingreso,
-                    "CIUDAD": ciudad,
-                    "NIVEL_PROF": nivel_prof,
-                }
-
-                for pregunta in preguntas:
-                    datos_encuesta[pregunta['item']
-                                   ] = st.session_state.respuestas[pregunta['item']]
-
-                if guardar_en_firestore(st.session_state.nro_control, datos_encuesta):
-                    st.success("¡Gracias por completar la encuesta!")
-                    st.session_state.respuestas = {}  # Limpiar respuestas después del envío
-            else:
-                st.warning(
-                    "Por favor, complete todas las preguntas antes de enviar.")
-
-
-if __name__ == "__main__":
-    app()
+                    "ID"}
