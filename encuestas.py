@@ -113,6 +113,15 @@ def app():
                 color: white;
                 font-weight: bold;
             }
+            .recuadro-preguntas-no-respondidas {
+                border: 2px solid red;
+                padding: 15px;
+                margin-top: 20px;
+                background-color: #f8d7da;
+                color: red;
+                font-weight: bold;
+                border-radius: 5px;
+            }
         </style>
         """,
         unsafe_allow_html=True
@@ -216,10 +225,17 @@ def app():
         st.markdown(
             f"<b>Progreso:</b> {porcentaje_respondido:.2f}%", unsafe_allow_html=True)
 
-        # Mostrar preguntas no respondidas
+        # Mostrar preguntas no respondidas en un recuadro destacado
         if preguntas_no_respondidas:
-            st.warning(f"Por favor, responda las siguientes preguntas: {
-                       ', '.join(preguntas_no_respondidas)}")
+            st.markdown(
+                f"""
+                <div class="recuadro-preguntas-no-respondidas">
+                    <b>Las siguientes preguntas aún no han sido respondidas:</b><br>
+                    {', '.join(preguntas_no_respondidas)}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
         # Botón de envío
         enviar = st.button("Enviar Encuesta", key="enviar")
@@ -235,16 +251,15 @@ def app():
                     "RANGO_INGRESO": rango_ingreso,
                     "CIUDAD": ciudad,
                     "NIVEL_PROF": nivel_prof,
-                    # Convertir respuestas a cadenas
-                    **{key: str(value) for key, value in st.session_state.respuestas.items()},
+                    **{key: str(value) for key, value in st.session_state.respuestas.items()}
                 }
                 if guardar_en_firestore(st.session_state.nro_control, datos_encuesta):
-                    st.success(
-                        "¡Gracias por participar! La encuesta ha sido enviada.")
-                    st.balloons()
+                    st.success("¡Gracias por completar la encuesta!")
+                    # Limpiar el estado de las respuestas
+                    st.session_state.respuestas = {}
             else:
                 st.warning(
-                    "Por favor, responda todas las preguntas antes de enviar.")
+                    "Por favor, complete todas las preguntas antes de enviar.")
 
 
 if __name__ == "__main__":
