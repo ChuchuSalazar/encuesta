@@ -35,8 +35,8 @@ def cargar_preguntas():
         pregunta = {
             "item": row['item'],
             "pregunta": row['pregunta'],
-            "escala": row['escala'],
-            # Separar las opciones por coma
+            "escala": row['escala'],  # El número de opciones de la escala
+            # Opciones separadas por coma
             "posibles_respuestas": row['posibles_respuestas'].split(',')
         }
         preguntas.append(pregunta)
@@ -54,13 +54,15 @@ def generar_id_encuesta():
 def obtener_fecha_hora():
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-# Guardar en Firestore con estructura validada
+# Guardar en Firestore
 
 
 def guardar_en_firestore(id_encuesta, data):
     try:
+        # Convertir todos los valores del diccionario a cadenas
+        data_str = {key: str(value) for key, value in data.items()}
         doc_ref = db.collection("encuestas").document(id_encuesta)
-        doc_ref.set(data)
+        doc_ref.set(data_str)
         return True
     except Exception as e:
         st.error(f"Error al guardar en Firestore: {e}")
@@ -97,7 +99,7 @@ def app():
             }
         </style>
         """,
-        unsafe_allow_html=True,
+        unsafe_allow_html=True
     )
 
     col1, col2 = st.columns([1, 2])
@@ -129,43 +131,16 @@ def app():
                 <b>Fecha y Hora:</b> {st.session_state.fecha_hora}
             </div>
             """,
-            unsafe_allow_html=True,
+            unsafe_allow_html=True
         )
 
         preguntas = cargar_preguntas()
 
-        # Sección de datos demográficos
-        st.header("Datos Demográficos")
-        sexo = st.selectbox("Sexo", ["Masculino", "Femenino"], key="sexo")
-        rango_edad = st.selectbox(
-            "Rango de Edad",
-            ["18-25", "26-35", "36-45", "46-55", "56 o más"],
-            key="rango_edad",
-        )
-        rango_ingreso = st.selectbox(
-            "Rango de Ingreso", ["<1000", "1000-3000", "3000-5000", ">5000"], key="rango_ingreso"
-        )
-        ciudad = st.selectbox(
-            "Ciudad",
-            [
-                "Caracas", "Maracaibo", "Valencia", "Barquisimeto",
-                "Maracay", "Ciudad Guayana", "Puerto La Cruz",
-                "San Cristóbal", "Mérida", "Otro"
-            ],
-            key="ciudad",
-        )
-        nivel_prof = st.selectbox(
-            "Nivel Educativo", ["Bachillerato", "Universitario", "Postgrado"], key="nivel_prof"
-        )
-
-        # Inicializar respuestas de las preguntas
         if "respuestas" not in st.session_state:
             st.session_state.respuestas = {
-                pregunta["item"]: None for pregunta in preguntas
-            }
+                pregunta['item']: None for pregunta in preguntas}
 
-        # Mostrar preguntas
-        st.header("Preguntas")
+        # Mostrar preguntas dentro de recuadros azules y calcular el progreso
         for pregunta in preguntas:
             st.markdown(
                 f"""
@@ -173,56 +148,62 @@ def app():
                     <p><b>{pregunta['pregunta']}</b></p>
                 </div>
                 """,
-                unsafe_allow_html=True,
+                unsafe_allow_html=True
             )
-            respuesta = st.radio(
-                "",
-                # Usamos directamente las opciones como cadenas
-                options=pregunta["posibles_respuestas"],
-                key=pregunta["item"],
-            )
-            st.session_state.respuestas[pregunta["item"]] = respuesta
 
-        # Contador dinámico de preguntas respondidas
+            # Mostrar las opciones de respuesta según la escala
+            # Si la escala es 5 (por ejemplo, Likert 5 puntos)
+            if pregunta['escala'] == "5":
+                options = pregunta['posibles_respuestas']
+                st.radio(
+                    "",
+                    options,
+                    key=pregunta['item']
+                )
+            else:
+                # Si la escala no es 5, se ajusta según el número de opciones
+                options = pregunta['posibles_respuestas']
+                st.radio(
+                    "",
+                    options,
+                    key=pregunta['item']
+                )
+
+        # Calcular el porcentaje de progreso basado en las respuestas
         preguntas_respondidas = sum(
-            [1 for r in st.session_state.respuestas.values() if r is not None]
-        )
+            [1 for r in st.session_state.respuestas.values() if r is not None])
         total_preguntas = len(preguntas)
         porcentaje_respondido = (preguntas_respondidas / total_preguntas) * 100
 
         # Mostrar el porcentaje de avance
         st.markdown(
-            f"<b>Progreso:</b> {porcentaje_respondido:.2f}%",
-            unsafe_allow_html=True,
-        )
+            f"<b>Progreso:</b> {porcentaje_respondido:.2f}%", unsafe_allow_html=True)
 
         # Botón de envío
         enviar = st.button("Enviar Encuesta", key="enviar")
 
         if enviar:
-            if preguntas_respondidas == total_preguntas and ciudad.strip():
+            if preguntas_respondidas == total_preguntas:
+                # Guardar los datos en Firestore
                 datos_encuesta = {
-                    "ID": st.session_state.nro_control,
+                    "ID": str(st.session_state.nro_control),
                     "FECHA": st.session_state.fecha_hora,
                     "SEXO": sexo,
                     "RANGO_EDAD": rango_edad,
                     "RANGO_INGRESO": rango_ingreso,
                     "CIUDAD": ciudad,
                     "NIVEL_PROF": nivel_prof,
-                    **st.session_state.respuestas,
+                    # Convertir respuestas a cadenas
+                    **{key: str(value) for key, value in st.session_state.respuestas.items()},
                 }
-                if guardar_en_firestore(
-                    st.session_state.nro_control, datos_encuesta
-                ):
-                    st.success(
-                        "¡Gracias por participar! La encuesta ha sido enviada."
-                    )
-                    st.balloons()
-                    st.session_state.respuestas = None
+                guardar_en_firestore(
+                    st.session_state.nro_control, datos_encuesta)
+                st.success(
+                    "¡Gracias por participar! La encuesta ha sido enviada.")
+                st.balloons()
             else:
                 st.warning(
-                    "Por favor, complete todos los campos antes de enviar."
-                )
+                    "Por favor, responda todas las preguntas antes de enviar.")
 
 
 if __name__ == "__main__":
