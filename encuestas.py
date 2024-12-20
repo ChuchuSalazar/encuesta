@@ -1,4 +1,3 @@
-# Importar las bibliotecas necesarias
 import os
 import firebase_admin
 from firebase_admin import credentials, firestore, initialize_app, get_app
@@ -58,6 +57,9 @@ def obtener_fecha_hora():
 
 def guardar_en_firestore(id_encuesta, data):
     try:
+        if any(value is None or value == "" for value in data.values()):
+            raise ValueError(
+                "One or more components is not a string or is empty.")
         doc_ref = db.collection("encuestas").document(id_encuesta)
         doc_ref.set(data)
         return True
@@ -90,6 +92,7 @@ def app():
                 margin-bottom: 20px;
                 border-radius: 5px;
                 background-color: white;
+                font-family: Arial, sans-serif;
             }
             .recuadro-control {
                 border: 1px solid #0078D4;
@@ -98,11 +101,13 @@ def app():
                 border-radius: 5px;
                 background-color: white;
                 font-size: 1em;
+                font-family: Arial, sans-serif;
             }
             .boton-enviar {
                 background-color: #0078D4;
                 color: white;
                 font-weight: bold;
+                font-family: Arial, sans-serif;
             }
             .rojo {
                 background-color: #FF6B6B;
@@ -155,13 +160,16 @@ def app():
             st.session_state.respuestas = {
                 pregunta['item']: "Seleccione una opción" for pregunta in preguntas}
 
-        # Mostrar preguntas dentro de recuadros azules
+        # Inicializar la lista de preguntas no respondidas
         no_respondidas = []
+
+        # Mostrar preguntas dentro de recuadros azules
         for pregunta in preguntas:
             respuesta = st.radio(
                 pregunta['pregunta'],
                 pregunta['posibles_respuestas'],
-                key=pregunta['item']
+                key=pregunta['item'],
+                index=0  # No hay respuesta por defecto
             )
             st.session_state.respuestas[pregunta['item']] = respuesta
 
