@@ -36,6 +36,7 @@ def cargar_preguntas():
             "item": row['item'],
             "pregunta": row['pregunta'],
             "escala": row['escala'],
+            # Separar las opciones por coma
             "posibles_respuestas": row['posibles_respuestas'].split(',')
         }
         preguntas.append(pregunta)
@@ -144,7 +145,15 @@ def app():
         rango_ingreso = st.selectbox(
             "Rango de Ingreso", ["<1000", "1000-3000", "3000-5000", ">5000"], key="rango_ingreso"
         )
-        ciudad = st.text_input("Ciudad", key="ciudad")
+        ciudad = st.selectbox(
+            "Ciudad",
+            [
+                "Caracas", "Maracaibo", "Valencia", "Barquisimeto",
+                "Maracay", "Ciudad Guayana", "Puerto La Cruz",
+                "San Cristóbal", "Mérida", "Otro"
+            ],
+            key="ciudad",
+        )
         nivel_prof = st.selectbox(
             "Nivel Educativo", ["Bachillerato", "Universitario", "Postgrado"], key="nivel_prof"
         )
@@ -168,7 +177,8 @@ def app():
             )
             respuesta = st.radio(
                 "",
-                options=[int(op) for op in pregunta["posibles_respuestas"]],
+                # Usamos directamente las opciones como cadenas
+                options=pregunta["posibles_respuestas"],
                 key=pregunta["item"],
             )
             st.session_state.respuestas[pregunta["item"]] = respuesta
@@ -199,10 +209,7 @@ def app():
                     "RANGO_INGRESO": rango_ingreso,
                     "CIUDAD": ciudad,
                     "NIVEL_PROF": nivel_prof,
-                    **{
-                        k: (v if v is not None else "Sin respuesta")
-                        for k, v in st.session_state.respuestas.items()
-                    },
+                    **st.session_state.respuestas,
                 }
                 if guardar_en_firestore(
                     st.session_state.nro_control, datos_encuesta
