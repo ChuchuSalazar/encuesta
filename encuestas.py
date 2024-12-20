@@ -68,6 +68,22 @@ def guardar_en_firestore(id_encuesta, data):
         st.error(f"Error al guardar en Firestore: {e}")
         return False
 
+# Función para mostrar preguntas generales (sexo, edad, etc.)
+
+
+def mostrar_preguntas_generales():
+    sexo = st.radio("Sexo", ["Masculino", "Femenino", "Otro"], key="sexo")
+    rango_edad = st.selectbox(
+        "Rango de Edad", ["18-25", "26-35", "36-45", "46-60", "60+"], key="rango_edad")
+    rango_ingreso = st.selectbox("Rango de Ingreso", [
+                                 "<5000", "5000-10000", "10000-20000", "20000+"], key="rango_ingreso")
+    ciudad = st.selectbox("Ciudad", [
+                          "Caracas", "Maracaibo", "Valencia", "Barquisimeto", "Otras"], key="ciudad")
+    nivel_prof = st.selectbox("Nivel Profesional", [
+                              "Bachiller", "Licenciatura", "Maestría", "Doctorado"], key="nivel_prof")
+
+    return sexo, rango_edad, rango_ingreso, ciudad, nivel_prof
+
 # Aplicación principal
 
 
@@ -134,18 +150,30 @@ def app():
             unsafe_allow_html=True
         )
 
+        # Preguntas generales
+        sexo, rango_edad, rango_ingreso, ciudad, nivel_prof = mostrar_preguntas_generales()
+
+        # Cargar preguntas adicionales
         preguntas = cargar_preguntas()
 
         if "respuestas" not in st.session_state:
             st.session_state.respuestas = {
                 pregunta['item']: None for pregunta in preguntas}
+            # Incluir las preguntas generales en el control de respuestas
+            st.session_state.respuestas["sexo"] = None
+            st.session_state.respuestas["rango_edad"] = None
+            st.session_state.respuestas["rango_ingreso"] = None
+            st.session_state.respuestas["ciudad"] = None
+            st.session_state.respuestas["nivel_prof"] = None
 
         # Mostrar preguntas dentro de recuadros azules y calcular el progreso
-        for pregunta in preguntas:
+        for i, pregunta in enumerate(preguntas, start=1):
+            # Numera las preguntas del 01 al 25
+            pregunta_numero = f"Pregunta {i:02d}"
             st.markdown(
                 f"""
                 <div class="pregunta">
-                    <p><b>{pregunta['pregunta']}</b></p>
+                    <p><b>{pregunta_numero}: {pregunta['pregunta']}</b></p>
                 </div>
                 """,
                 unsafe_allow_html=True
@@ -172,7 +200,8 @@ def app():
         # Calcular el porcentaje de progreso basado en las respuestas
         preguntas_respondidas = sum(
             [1 for r in st.session_state.respuestas.values() if r is not None])
-        total_preguntas = len(preguntas)
+        # Incluyendo las 5 preguntas generales
+        total_preguntas = len(preguntas) + 5
         porcentaje_respondido = (preguntas_respondidas / total_preguntas) * 100
 
         # Mostrar el porcentaje de avance
