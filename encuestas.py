@@ -1,3 +1,4 @@
+# Importar las bibliotecas necesarias
 import os
 import firebase_admin
 from firebase_admin import credentials, firestore, initialize_app, get_app
@@ -7,7 +8,7 @@ import random
 import datetime
 from dotenv import load_dotenv
 
-# Cargar las credenciales de Firebase desde la variable de entorno
+# Cargar las credenciales de Firebase desde el archivo .env
 load_dotenv()
 FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS")
 
@@ -57,25 +58,12 @@ def obtener_fecha_hora():
 
 def guardar_en_firestore(id_encuesta, data):
     try:
-        if any(value is None or value == "" for value in data.values()):
-            raise ValueError(
-                "One or more components is not a string or is empty.")
         doc_ref = db.collection("encuestas").document(id_encuesta)
         doc_ref.set(data)
         return True
     except Exception as e:
         st.error(f"Error al guardar en Firestore: {e}")
         return False
-
-# Función de validación de respuestas
-
-
-def validar_respuestas(respuestas):
-    no_respondidas = []
-    for key, value in respuestas.items():
-        if value is None or value == "Seleccione una opción":
-            no_respondidas.append(key)
-    return no_respondidas
 
 # Aplicación principal
 
@@ -92,7 +80,6 @@ def app():
                 margin-bottom: 20px;
                 border-radius: 5px;
                 background-color: white;
-                font-family: Arial, sans-serif;
             }
             .recuadro-control {
                 border: 1px solid #0078D4;
@@ -101,21 +88,11 @@ def app():
                 border-radius: 5px;
                 background-color: white;
                 font-size: 1em;
-                font-family: Arial, sans-serif;
             }
             .boton-enviar {
                 background-color: #0078D4;
                 color: white;
                 font-weight: bold;
-                font-family: Arial, sans-serif;
-            }
-            .rojo {
-                background-color: #FF6B6B;
-                border: 2px solid red;
-            }
-            .bloqueado {
-                background-color: #F0F0F0;
-                pointer-events: none;
             }
         </style>
         """,
@@ -158,62 +135,71 @@ def app():
 
         if "respuestas" not in st.session_state:
             st.session_state.respuestas = {
-                pregunta['item']: "Seleccione una opción" for pregunta in preguntas}
+                pregunta['item']: None for pregunta in preguntas}
 
-        # Inicializar la lista de preguntas no respondidas
-        no_respondidas = []
-
-        # Mostrar preguntas dentro de recuadros azules
+        # Mostrar preguntas en un formato de recuadros azules
         for pregunta in preguntas:
+            st.markdown(
+                f"""
+                <div class="pregunta">
+                    <p><b>{pregunta['pregunta']}</b></p>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
             respuesta = st.radio(
-                pregunta['pregunta'],
+                "",
                 pregunta['posibles_respuestas'],
                 key=pregunta['item'],
-                index=0  # No hay respuesta por defecto
+                index=-1  # Ninguna opción seleccionada por defecto
             )
-            st.session_state.respuestas[pregunta['item']] = respuesta
 
-            # Marcar en rojo las preguntas no respondidas
-            if respuesta == "Seleccione una opción":
-                no_respondidas.append(pregunta['item'])
+            # Guardar las respuestas
+            if respuesta is not None:
+                st.session_state.respuestas[pregunta['item']] = respuesta
 
-        # Calcular el porcentaje de respuestas
-        preguntas_respondidas = len(preguntas) - len(no_respondidas)
+        # Validación de respuestas antes de enviar
+        preguntas_respondidas = sum(
+            [1 for r in st.session_state.respuestas.values() if r is not None])
         total_preguntas = len(preguntas)
         porcentaje_respondido = (preguntas_respondidas / total_preguntas) * 100
 
-        # Mostrar el porcentaje de avance
+        # Mostrar el porcentaje de progreso
         st.markdown(
             f"<b>Progreso:</b> {porcentaje_respondido:.2f}%", unsafe_allow_html=True)
-
-        # Mostrar el número de preguntas no respondidas
-        if len(no_respondidas) > 0:
-            st.warning(
-                f"Por favor, responda las siguientes preguntas: {', '.join(no_respondidas)}")
 
         # Botón de envío
         enviar = st.button("Enviar Encuesta", key="enviar")
 
         if enviar:
-            if len(no_respondidas) == 0:
-                if guardar_en_firestore(st.session_state.nro_control, st.session_state.respuestas):
+            if preguntas_respondidas == total_preguntas:
+                # Guardar respuestas en Firestore
+                datos_encuesta = {
+                    "nro_control": st.session_state.nro_control,
+                    "fecha_hora": st.session_state.fecha_hora,
+                    "respuestas": st.session_state.respuestas
+                }
+                if guardar_en_firestore(st.session_state.nro_control, datos_encuesta):
                     st.success(
                         "¡Gracias por participar! La encuesta ha sido enviada.")
                     st.balloons()
-
-                    # Bloquear la encuesta después de enviarla
-                    st.markdown(
-                        """
-                        <style>
-                            .stApp {
-                                background-color: #F0F0F0;
-                                pointer-events: none;
-                            }
-                        </style>
-                        """, unsafe_allow_html=True)
+                else:
+                    st.error("Hubo un problema al guardar los datos.")
             else:
                 st.warning(
-                    f"Por favor, responda las siguientes preguntas: {', '.join(no_respondidas)}")
+                    "Por favor, responda todas las preguntas antes de enviar.")
+
+        # Mostrar las preguntas no respondidas en rojo
+        for pregunta, respuesta in st.session_state.respuestas.items():
+            if respuesta is None:
+                st.markdown(
+                    f"""
+                    <style>
+                        .pregunta-{pregunta} {{
+                            border: 2px solid red;
+                        }}
+                    </style>
+                    """, unsafe_allow_html=True)
 
 
 if __name__ == "__main__":
